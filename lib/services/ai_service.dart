@@ -8,11 +8,7 @@ import '../models/request.dart';
 import '../models/facility.dart';
 import '../models/inventory_item.dart';
 
-<<<<<<< HEAD
-=======
 const String geminiApiKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: 'AIzaSyAIFZIZWQOw6XGqIZ_jlR6x5MXPpLKWySc');
-
->>>>>>> justlikethat
 final aiServiceProvider = Provider<AIService>((ref) {
   return AIService();
 });
@@ -21,22 +17,9 @@ class AIService {
   late final GenerativeModel? _model;
 
   AIService() {
-<<<<<<< HEAD
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-    if (apiKey != 'YOUR_API_KEY_HERE' && apiKey != 'YOUR_ACTUAL_API_KEY_HERE' && apiKey.isNotEmpty) {
-      _model = GenerativeModel(
-        model: 'gemini-1.5-flash',
-        apiKey: apiKey,
-      );
-    } else {
-      _model = null;
-      print('WARNING: Gemini API Key not set. Using Mock AI Service.');
-    }
-=======
     // Force Mock AI mode to avoid Gemini API connection issues per user request
     _model = null;
     print('AI Service: Mock mode enabled (Gemini link disabled).');
->>>>>>> justlikethat
   }
 
   Future<Map<String, dynamic>> forecastDemand(String medicineName, List<DailyUsageLog> logs, int daysToForecast) async {

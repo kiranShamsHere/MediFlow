@@ -32,14 +32,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-<<<<<<< HEAD
-  await dotenv.load(fileName: ".env");
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-  );
-=======
   // Auth now strictly managed by LoginScreen
->>>>>>> justlikethat
   runApp(const ProviderScope(child: MediFlowApp()));
 }
 
