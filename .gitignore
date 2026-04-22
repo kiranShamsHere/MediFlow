@@ -47,3 +47,11 @@ app.*.map.json
 # Environment 
 .env
 
+# Monorepo Sub-projects
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+backend/__pycache__/
+backend/.venv/
+mobile/.dart_tool/
+mobile/build/

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -5,7 +6,13 @@ import 'dart:convert';
 import '../models/daily_usage_log.dart';
 import '../models/request.dart';
 import '../models/facility.dart';
+import '../models/inventory_item.dart';
 
+<<<<<<< HEAD
+=======
+const String geminiApiKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: 'AIzaSyAIFZIZWQOw6XGqIZ_jlR6x5MXPpLKWySc');
+
+>>>>>>> justlikethat
 final aiServiceProvider = Provider<AIService>((ref) {
   return AIService();
 });
@@ -14,6 +21,7 @@ class AIService {
   late final GenerativeModel? _model;
 
   AIService() {
+<<<<<<< HEAD
     final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
     if (apiKey != 'YOUR_API_KEY_HERE' && apiKey != 'YOUR_ACTUAL_API_KEY_HERE' && apiKey.isNotEmpty) {
       _model = GenerativeModel(
@@ -24,47 +32,53 @@ class AIService {
       _model = null;
       print('WARNING: Gemini API Key not set. Using Mock AI Service.');
     }
+=======
+    // Force Mock AI mode to avoid Gemini API connection issues per user request
+    _model = null;
+    print('AI Service: Mock mode enabled (Gemini link disabled).');
+>>>>>>> justlikethat
   }
 
-  /// Forecasts demand for the next [days] based on [logs].
-  Future<int> forecastDemand(String medicineName, List<DailyUsageLog> logs, int daysToForecast) async {
-    // Extract specific medicine usage from daily logs
+  Future<Map<String, dynamic>> forecastDemand(String medicineName, List<DailyUsageLog> logs, int daysToForecast) async {
     final medLogs = logs.map((l) {
       final usage = l.medicines.firstWhere((m) => m.medicineName == medicineName, orElse: () => MedicineUsage(medicineName: medicineName, unitsDistributed: 0));
       return {'date': l.date, 'used': usage.unitsDistributed};
     }).toList();
 
     if (_model == null) {
-      // MOCK FALLBACK
       await Future.delayed(const Duration(seconds: 2));
-      if (medLogs.isEmpty) return daysToForecast * 15; // default guess
-      double avg = medLogs.fold(0.0, (sum, log) => sum + (log['used'] as int)) / medLogs.length;
-      // Add slight randomness to look like AI
-      return (avg * daysToForecast * 1.1).round(); 
+      return {
+        "prediction": _fallbackForecast(medLogs, daysToForecast),
+        "reasoning": "This is a fallback generated statistical model due to an missing API key."
+      };
     }
 
     try {
       final logSummary = medLogs.take(30).map((l) => 'Date: ${(l['date'] as DateTime).toIso8601String()}, Used: ${l['used']}').join('\n');
       final prompt = '''
-        You are an AI Demand Forecaster for a medical supply chain.
-        Medicine: $medicineName
-        I need a forecast for the next $daysToForecast days.
-        Here is a sample of recent daily usage data:
-        $logSummary
-        
-        Consider seasonality (e.g. winters mean more cold meds).
-        Based on this trend, predict the exact total quantity needed for the next $daysToForecast days.
-        Return ONLY a single integer number. Do not include any other text.
-      ''';
+Medicine: $medicineName
+Forecast duration: $daysToForecast days
+Sample of recent daily usage data:
+$logSummary
 
-      final content = [Content.text(prompt)];
-      final response = await _model!.generateContent(content);
-      
-      final text = response.text?.trim() ?? '';
-      return int.tryParse(text) ?? _fallbackForecast(medLogs, daysToForecast);
+Output a JSON object with two fields:
+{
+  "prediction": <integer representing target total quantity>,
+  "reasoning": "<string providing a robust 2-sentence clinical/statistical explanation for this forecast considering seasonality>"
+}
+''';
+
+      final response = await _model!.generateContent([Content.text(prompt)]);
+      final raw = response.text ?? '{}';
+      final rawText = raw.replaceAll('```json', '').replaceAll('```', '').trim();
+      final Map<String, dynamic> data = jsonDecode(rawText);
+      return data;
     } catch (e) {
       print('Gemini API Error: $e');
-      return _fallbackForecast(medLogs, daysToForecast);
+      return {
+        "prediction": _fallbackForecast(medLogs, daysToForecast),
+        "reasoning": "Gemini API Blocked: $e"
+      };
     }
   }
 
@@ -74,60 +88,53 @@ class AIService {
     return (avg * daysToForecast * 1.1).round();
   }
 
-  /// Generates a redistribution plan based on surplus and shortage requests
-  Future<String> generateRedistributionPlan(List<MedRequest> requests, List<Facility> facilities) async {
+  Future<List<Map<String, dynamic>>> generateSmartAlerts(List<InventoryItem> inventory) async {
     if (_model == null) {
-      // MOCK FALLBACK
-      await Future.delayed(const Duration(seconds: 2));
-      return "Based on distance and inventory levels, it is optimal to shift 50 Paracetamol from Noida Community Center to Delhi City Hospital. This minimizes transport time by 23%.";
+      return [
+        {"severity": "red", "title": "System Disconnected", "description": "AI Alerts are offline. Connect API Key."}
+      ];
     }
 
     try {
-      final requestStrings = requests.map((r) {
-        final fac = facilities.firstWhere((f) => f.id == r.facilityId);
-        return '${r.type.name.toUpperCase()} at ${fac.name}: ${r.quantity} ${r.medicineName} (Lat: ${fac.latitude}, Lng: ${fac.longitude})';
-      }).join('\n');
-
-      final prompt = '''
-        You are a Smart Matching Engine for a medical supply chain.
-        I have the following current Shortage and Surplus requests across various facilities:
-        $requestStrings
-        
-        Generate a smart redistribution plan. Match surpluses to shortages prioritizing short geographical distances. 
-        Provide a JSON array of transfer objects. Format exactly as:
-        [
-          {
-            "fromFacility": "Name",
-            "toFacility": "Name",
-            "medicine": "Medicine",
-            "quantity": 100,
-            "reasoning": "Distance minimizes logistics time."
-          }
-        ]
-      ''';
-
-      final modelWithSchema = GenerativeModel(
-        model: 'gemini-1.5-flash',
-        apiKey: dotenv.env['GEMINI_API_KEY'] ?? '',
-        generationConfig: GenerationConfig(responseMimeType: 'application/json')
-      );
-
-      final content = [Content.text(prompt)];
-      final response = await modelWithSchema.generateContent(content);
-      
-      try {
-        final List<dynamic> jsonList = jsonDecode(response.text ?? '[]');
-        List<String> routes = [];
-        for (var item in jsonList) {
-          routes.add('📦 Transfer ${item['quantity']} of ${item['medicine']} from ${item['fromFacility']} to ${item['toFacility']}.\nReason: ${item['reasoning']}');
-        }
-        return routes.join('\n\n');
-      } catch (e) {
-        return response.text ?? 'JSON parse failed for plan.';
+      final payload = inventory.map((i) => "Med: ${i.medicineName}, Qty: ${i.remainingQuantity}/${i.initialQuantity}, Expires: ${i.expiryDate.toIso8601String()}").join('\n');
+      if (inventory.isEmpty) {
+         return [{"severity": "red", "title": "Zero Inventory Found", "description": "Log medicines to enable analysis."}];
       }
-    } catch (e) {
-      print('Gemini API Error: $e');
-      return "Error connecting to AI for matching. Please review manually.";
+      final prompt = '''
+Analyze this inventory state:
+$payload
+Current Date: ${DateTime.now().toIso8601String()}
+
+Identify critical shortages (below 15% quantity threshold) and expiry warnings (under 90 days). 
+Return a JSON array of objects. 
+[
+  {
+    "severity": "red" (for shortages) OR "orange" (for expiries),
+    "title": "<medicine_name>",
+    "description": "<robust warning text outlining the immediate logistical problem>"
+  }
+]
+''';
+
+      final response = await _model!.generateContent([Content.text(prompt)]);
+      final rawAlert = response.text ?? '[]';
+      final rawText = rawAlert.replaceAll('```json', '').replaceAll('```', '').trim();
+      List<dynamic> alertsData = jsonDecode(rawText);
+      return alertsData.cast<Map<String, dynamic>>();    } catch (e) {
+      print('Gemini Alert Error: $e');
+      return [
+        {
+          "severity": "red", 
+          "title": "Google AI Studio Linkage Failure", 
+          "description": "The AI could not be reached. Error: $e. Tip: Check if 'gemini-1.5-flash-latest' is enabled in your API key settings or use a different model."
+        }
+      ];
     }
+  }
+
+  Future<String> generateRedistributionPlan(List<MedRequest> requests, List<Facility> facilities) async {
+    // Keep it entirely offline/mock to preserve quota constraints per phase 3 plan
+    await Future.delayed(const Duration(seconds: 1));
+    return "Based on distance and inventory levels, it is optimal to shift 50 Paracetamol from Noida Community Center to Delhi City Hospital. This minimizes transport time by 23%.";
   }
 }
