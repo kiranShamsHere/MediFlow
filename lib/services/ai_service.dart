@@ -201,23 +201,17 @@ Answer naturally using the blueprint and data.
       "depletesInDays": (i.remainingQuantity / 24).round(),
     }).toList();
 
-    if (inventory.isNotEmpty) {
-      local.add({
-        "type": "expiry",
-        "severity": "red",
-        "title": inventory.first.medicineName,
-        "batchId": inventory.first.batchId,
-        "remainingQuantity": inventory.first.remainingQuantity,
-        "expiresInDays": 22,
-      });
-      if (inventory.length > 1) {
+    final now = DateTime.now();
+    for (var i in inventory) {
+      final daysToExpiry = i.expiryDate.difference(now).inDays;
+      if (daysToExpiry <= 90) {
         local.add({
           "type": "expiry",
-          "severity": "yellow",
-          "title": inventory[1].medicineName,
-          "batchId": inventory[1].batchId,
-          "remainingQuantity": inventory[1].remainingQuantity,
-          "expiresInDays": 45,
+          "severity": daysToExpiry <= 30 ? "red" : "yellow",
+          "title": i.medicineName,
+          "batchId": i.batchId,
+          "remainingQuantity": i.remainingQuantity,
+          "expiresInDays": daysToExpiry,
         });
       }
     }

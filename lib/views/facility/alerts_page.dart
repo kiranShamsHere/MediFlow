@@ -104,23 +104,35 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
   Widget _buildExpiryAlertCard(Map<String, dynamic> alert) {
     final severity = alert['severity'] ?? 'yellow';
     final isRed = severity == 'red';
-    final bgColor = isRed ? const Color(0xFFFCE8E8) : const Color(0xFFFEF4C7);
-    final borderColor = isRed ? const Color(0xFFF9BDBD) : const Color(0xFFFDE68A);
-    final iconColor = isRed ? const Color(0xFF9B1C1C) : const Color(0xFF92400E);
-    final icon = isRed ? Icons.no_drinks : Icons.medication;
+    final accentColor = isRed ? MediColors.error : MediColors.warning;
+    final icon = isRed ? Icons.warning_rounded : Icons.info_outline_rounded;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
+        color: MediColors.surfaceLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.05),
+            blurRadius: 10,
+            spreadRadius: 1,
+          )
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: iconColor, size: 24),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: accentColor, size: 24),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -130,9 +142,9 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text(alert['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: MediColors.textPrimary)),
+                    Text(alert['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: MediColors.textPrimary)),
                     const SizedBox(width: 8),
-                    Text(alert['batchId'] ?? '', style: const TextStyle(fontSize: 12, color: MediColors.textSecondary, fontWeight: FontWeight.w500)),
+                    Text(alert['batchId'] ?? '', style: const TextStyle(fontSize: 12, color: MediColors.textMuted, fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -142,8 +154,8 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    _buildActionButton('Request Redistribution', iconColor, borderColor),
-                    _buildActionButton('Mark for Disposal', iconColor, borderColor),
+                    _buildActionButton('Request Redistribution', accentColor),
+                    _buildActionButton('Mark for Disposal', accentColor),
                   ],
                 ),
               ],
@@ -155,22 +167,34 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
   }
 
   Widget _buildLowStockAlertCard(Map<String, dynamic> alert) {
-    final bgColor = const Color(0xFFFCE8E8);
-    final borderColor = const Color(0xFFF9BDBD);
-    final iconColor = const Color(0xFF9B1C1C);
+    final accentColor = MediColors.error;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
+        color: MediColors.surfaceLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.05),
+            blurRadius: 10,
+            spreadRadius: 1,
+          )
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.trending_down_rounded, color: iconColor, size: 24),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.trending_down_rounded, color: accentColor, size: 24),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -180,9 +204,9 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text(alert['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: MediColors.textPrimary)),
+                    Text(alert['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: MediColors.textPrimary)),
                     const SizedBox(width: 8),
-                    Text(alert['batchId'] ?? '', style: const TextStyle(fontSize: 12, color: MediColors.textSecondary, fontWeight: FontWeight.w500)),
+                    Text(alert['batchId'] ?? '', style: const TextStyle(fontSize: 12, color: MediColors.textMuted, fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -192,7 +216,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    _buildActionButton('Request Restock', iconColor, borderColor),
+                    _buildActionButton('Request Restock', accentColor),
                   ],
                 ),
               ],
@@ -203,16 +227,17 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
     );
   }
 
-  Widget _buildActionButton(String text, Color textColor, Color borderColor) {
+  Widget _buildActionButton(String text, Color accentColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: accentColor.withValues(alpha: 0.5)),
+        color: accentColor.withValues(alpha: 0.05),
       ),
       child: Text(
         text,
-        style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w500),
+        style: TextStyle(color: accentColor, fontSize: 13, fontWeight: FontWeight.w600),
       ),
     );
   }
