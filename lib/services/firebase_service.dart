@@ -31,33 +31,24 @@ class FirebaseService {
     required String name,
     required String email,
     required String password,
-    String? type, // 'rural' or 'urban'
+    String? type,
   }) async {
-    String facilityId;
+    // 1. Generate a deterministic ID from email to bypass Auth dependency
+    // This ensures Firestore docs are created even if Auth rate limits hit.
+    final String facilityId = email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+    
+    // 2. Try to create Auth User in background (Non-blocking for data seeding)
     try {
-      // 1. Create Auth User
-      final credential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      facilityId = credential.user!.uid;
-    } on auth.FirebaseAuthException catch (e) {
-      if (e.code == 'email-already-in-use') {
-        try {
-          // If user exists, sign in to get the UID
-          final credential = await _auth.signInWithEmailAndPassword(email: email, password: password);
-          facilityId = credential.user!.uid;
-        } catch (_) {
-          facilityId = email.replaceAll('@mediflow.com', '_fallback_id');
-        }
-      } else {
-        facilityId = email.replaceAll('@mediflow.com', '_fallback_id');
-      }
+      await _auth.createUserWithEmailAndPassword(email: email, password: password);
     } catch (e) {
-      facilityId = email.replaceAll('@mediflow.com', '_fallback_id');
+      // If user exists or rate limit hits, we don't care for seeding Firestore data
+      print('Auth skip/fail for $email: $e');
     }
 
-    // 2. Generate Profile
+    // 3. Generate Profile
     final profile = _simulation.generateRealisticProfile(type: type);
     
-    // 3. Create Facility Document
+    // 4. Create Facility Document
     final facility = Facility(
       id: facilityId,
       name: name,
@@ -71,7 +62,7 @@ class FirebaseService {
 
     await _firestore.collection('facilities').doc(facilityId).set(facility.toMap());
 
-    // 4. Run Initial Simulation (120 days)
+    // 5. Run Initial Simulation (30 days)
     await _simulation.runFullSimulation(facilityId, facility.type);
   }
 
