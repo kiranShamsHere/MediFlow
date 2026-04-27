@@ -211,6 +211,25 @@ class FirebaseService {
     await _firestore.collection('requests').doc(requestId).delete();
   }
 
+  Future<void> disposeInventory(String facilityId, String medicineName) async {
+    final medicineId = medicineName.toLowerCase().replaceAll(' ', '_');
+    final invRef = _firestore
+        .collection('inventory')
+        .doc(facilityId)
+        .collection('medicines')
+        .doc(medicineId);
+
+    await _firestore.runTransaction((transaction) async {
+      final invDoc = await transaction.get(invRef);
+      if (invDoc.exists) {
+        transaction.update(invRef, {
+          'remainingQuantity': 0,
+          'lastUpdated': Timestamp.now(),
+        });
+      }
+    });
+  }
+
   // --- CLEANUP & SEEDING ---
 
   Future<void> clearDatabase() async {

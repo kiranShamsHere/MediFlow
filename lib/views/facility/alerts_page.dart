@@ -5,6 +5,7 @@ import '../../services/ai_service.dart';
 import '../../models/inventory_item.dart';
 import '../../main.dart';
 import '../shared/ai_chat_page.dart';
+import '../../models/request.dart';
 
 class AlertsPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -32,6 +33,62 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
       if (mounted) setState(() { _alerts = alerts; _isLoading = false; });
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleRestock(Map<String, dynamic> alert) async {
+    try {
+      final request = MedRequest(
+        id: '',
+        facilityId: widget.facilityId,
+        medicineName: alert['title'] ?? '',
+        type: RequestType.shortage,
+        quantity: 500,
+        requestDate: DateTime.now(),
+        status: RequestStatus.pending,
+        notes: 'AI generated low stock alert',
+      );
+      await ref.read(firebaseServiceProvider).addRequest(request);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Restock request submitted for ${alert['title']}')));
+        _loadAlerts();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _handleRedistribution(Map<String, dynamic> alert) async {
+    try {
+      final request = MedRequest(
+        id: '',
+        facilityId: widget.facilityId,
+        medicineName: alert['title'] ?? '',
+        type: RequestType.surplus,
+        quantity: alert['remainingQuantity'] ?? 0,
+        requestDate: DateTime.now(),
+        status: RequestStatus.pending,
+        notes: 'Expiry alert surplus redistribution',
+      );
+      await ref.read(firebaseServiceProvider).addRequest(request);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Redistribution listed for ${alert['title']}')));
+        _loadAlerts();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _handleDisposal(Map<String, dynamic> alert) async {
+    try {
+      await ref.read(firebaseServiceProvider).disposeInventory(widget.facilityId, alert['title'] ?? '');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Marked ${alert['title']} for safe disposal.')));
+        _loadAlerts();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -154,8 +211,8 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    _buildActionButton('Request Redistribution', accentColor),
-                    _buildActionButton('Mark for Disposal', accentColor),
+                    _buildActionButton('Request Redistribution', accentColor, () => _handleRedistribution(alert)),
+                    _buildActionButton('Mark for Disposal', accentColor, () => _handleDisposal(alert)),
                   ],
                 ),
               ],
@@ -216,7 +273,7 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    _buildActionButton('Request Restock', accentColor),
+                    _buildActionButton('Request Restock', accentColor, () => _handleRestock(alert)),
                   ],
                 ),
               ],
@@ -227,17 +284,21 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
     );
   }
 
-  Widget _buildActionButton(String text, Color accentColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: accentColor.withValues(alpha: 0.5)),
-        color: accentColor.withValues(alpha: 0.05),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(color: accentColor, fontSize: 13, fontWeight: FontWeight.w600),
+  Widget _buildActionButton(String text, Color accentColor, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: accentColor.withValues(alpha: 0.5)),
+          color: accentColor.withValues(alpha: 0.05),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(color: accentColor, fontSize: 13, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
