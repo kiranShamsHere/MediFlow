@@ -74,11 +74,26 @@ class SimulationService {
         .collection('medicines')
         .get();
 
+    // Create a specific "health persona" for this facility to make the dashboard varied
+    // 1: Critical (Low stock), 2: Surplus (High stock), 0: Normal
+    final int persona = _random.nextInt(3);
+
     for (var doc in medsSnapshot.docs) {
       final data = doc.data();
       final int initial = data['initialQuantity'] ?? 2000;
-      // Set remaining to 30-70% of initial for realistic dashboard view
-      final double factor = 0.3 + (_random.nextDouble() * 0.4);
+      
+      double factor;
+      if (persona == 1) {
+        // Critical Health: 15% - 30%
+        factor = 0.15 + (_random.nextDouble() * 0.15);
+      } else if (persona == 2) {
+        // High Health: 75% - 95%
+        factor = 0.75 + (_random.nextDouble() * 0.20);
+      } else {
+        // Normal: 40% - 65%
+        factor = 0.40 + (_random.nextDouble() * 0.25);
+      }
+
       final int remaining = (initial * factor).round();
       await doc.reference.update({
         'remainingQuantity': remaining,

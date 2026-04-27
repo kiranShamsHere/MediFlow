@@ -304,6 +304,44 @@ class FirebaseService {
           return 'Failed at ${f['name']}: $e';
         }
       }
+
+      // 4. Seed sample requests for Admin Dashboard KPIs
+      final String f1Id = demoFacilities[0]['email']!.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+      final String f2Id = demoFacilities[1]['email']!.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+      
+      await createRequest(MedRequest(
+        id: '', 
+        facilityId: f1Id, 
+        medicineName: 'Antibiotic', 
+        type: RequestType.shortage, 
+        quantity: 500, 
+        requestDate: DateTime.now(), 
+        status: RequestStatus.pending,
+        notes: 'Stock critically low due to seasonal surge.'
+      ));
+
+      await createRequest(MedRequest(
+        id: '', 
+        facilityId: f2Id, 
+        medicineName: 'Paracetamol', 
+        type: RequestType.surplus, 
+        quantity: 1200, 
+        requestDate: DateTime.now(), 
+        status: RequestStatus.pending,
+        notes: 'Excess stock arriving soon, offering for redistribution.'
+      ));
+
+      await createRequest(MedRequest(
+        id: '', 
+        facilityId: f1Id, 
+        medicineName: 'ORS', 
+        type: RequestType.regularIndent, 
+        quantity: 800, 
+        requestDate: DateTime.now(), 
+        status: RequestStatus.pending,
+        notes: 'Monthly regular indent.'
+      ));
+
       return null; // Success
     } catch (e) {
       return 'Critical error: $e';
