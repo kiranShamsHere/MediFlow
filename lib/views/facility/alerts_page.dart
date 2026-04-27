@@ -4,6 +4,7 @@ import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../models/inventory_item.dart';
 import '../../main.dart';
+import '../shared/ai_chat_page.dart';
 
 class AlertsPage extends ConsumerStatefulWidget {
   final String facilityId;
@@ -36,10 +37,29 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final expiryAlerts = _alerts.where((a) => a['type'] == 'expiry').toList();
+    final lowStockAlerts = _alerts.where((a) => a['type'] == 'low_stock').toList();
+
     return Scaffold(
       backgroundColor: MediColors.bg,
       appBar: AppBar(
-        title: const Text('Smart Alerts'),
+        title: Row(
+          children: [
+            const Text('Alerts', style: TextStyle(fontWeight: FontWeight.w800, color: MediColors.textPrimary)),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'PHC Rampur',
+                style: TextStyle(fontSize: 12, color: Colors.blue.shade600, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: MediColors.textSecondary),
@@ -48,56 +68,153 @@ class _AlertsPageState extends ConsumerState<AlertsPage> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AIChatPage(role: "Facility Manager")));
+        },
+        backgroundColor: const Color(0xFF1E3A8A), // Dark blue sparkles button
+        child: const Icon(Icons.auto_awesome, color: Colors.white),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(28),
-              itemCount: _alerts.length + 1,
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('Alert Center', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: MediColors.textPrimary)),
-                      const SizedBox(height: 4),
-                      Text('${_alerts.length} active alerts detected', style: const TextStyle(color: MediColors.textSecondary)),
-                    ]),
-                  );
-                }
-                final alert = _alerts[index - 1];
-                final severity = alert['severity'] ?? 'red';
-                final color = severity == 'red' ? MediColors.error : severity == 'orange' ? MediColors.warning : MediColors.success;
-                final icon = severity == 'red' ? Icons.error_rounded : severity == 'orange' ? Icons.warning_rounded : Icons.check_circle_rounded;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: MediColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: color.withValues(alpha: 0.25)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                        child: Icon(icon, color: color, size: 22),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(alert['title'] ?? '', style: TextStyle(fontWeight: FontWeight.w700, color: color, fontSize: 15)),
-                          const SizedBox(height: 6),
-                          Text(alert['description'] ?? '', style: const TextStyle(color: MediColors.textSecondary, height: 1.5, fontSize: 13)),
-                        ]),
-                      ),
-                    ],
-                  ),
-                );
-              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (expiryAlerts.isNotEmpty) ...[
+                    const Text('Expiry Alerts', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: MediColors.textPrimary)),
+                    const SizedBox(height: 16),
+                    ...expiryAlerts.map((alert) => _buildExpiryAlertCard(alert)),
+                    const SizedBox(height: 32),
+                  ],
+                  if (lowStockAlerts.isNotEmpty) ...[
+                    const Text('Low Stock Alerts', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: MediColors.textPrimary)),
+                    const SizedBox(height: 16),
+                    ...lowStockAlerts.map((alert) => _buildLowStockAlertCard(alert)),
+                  ],
+                  if (expiryAlerts.isEmpty && lowStockAlerts.isEmpty)
+                    const Center(child: Text("No active alerts detected.", style: TextStyle(color: MediColors.textSecondary))),
+                ],
+              ),
             ),
     );
   }
+
+  Widget _buildExpiryAlertCard(Map<String, dynamic> alert) {
+    final severity = alert['severity'] ?? 'yellow';
+    final isRed = severity == 'red';
+    final bgColor = isRed ? const Color(0xFFFCE8E8) : const Color(0xFFFEF4C7);
+    final borderColor = isRed ? const Color(0xFFF9BDBD) : const Color(0xFFFDE68A);
+    final iconColor = isRed ? const Color(0xFF9B1C1C) : const Color(0xFF92400E);
+    final icon = isRed ? Icons.no_drinks : Icons.medication;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: iconColor, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(alert['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: MediColors.textPrimary)),
+                    const SizedBox(width: 8),
+                    Text(alert['batchId'] ?? '', style: const TextStyle(fontSize: 12, color: MediColors.textSecondary, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text('Expires in ${alert['expiresInDays']} days · ${alert['remainingQuantity']} units remaining', style: const TextStyle(color: MediColors.textSecondary, fontSize: 14)),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _buildActionButton('Request Redistribution', iconColor, borderColor),
+                    _buildActionButton('Mark for Disposal', iconColor, borderColor),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLowStockAlertCard(Map<String, dynamic> alert) {
+    final bgColor = const Color(0xFFFCE8E8);
+    final borderColor = const Color(0xFFF9BDBD);
+    final iconColor = const Color(0xFF9B1C1C);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.trending_down_rounded, color: iconColor, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(alert['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: MediColors.textPrimary)),
+                    const SizedBox(width: 8),
+                    Text(alert['batchId'] ?? '', style: const TextStyle(fontSize: 12, color: MediColors.textSecondary, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text('${alert['remainingPercentage']}% remaining · Burn rate: ${alert['burnRate']} · Depletes in ~${alert['depletesInDays']} days', style: const TextStyle(color: MediColors.textSecondary, fontSize: 14)),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _buildActionButton('Request Restock', iconColor, borderColor),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(String text, Color textColor, Color borderColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w500),
+      ),
+    );
+  }
 }
+

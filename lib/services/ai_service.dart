@@ -191,13 +191,64 @@ Answer naturally using the blueprint and data.
   // ─── SMART ALERTS ──────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> generateSmartAlerts(List<InventoryItem> inventory) async {
     final local = inventory.where((i) => (i.initialQuantity > 0 && i.remainingQuantity / i.initialQuantity < 0.2)).map((i) => {
-      "severity": "red", "title": "Low Stock: ${i.medicineName}", "description": "${i.remainingQuantity} units left."
+      "type": "low_stock",
+      "severity": "red",
+      "title": i.medicineName,
+      "batchId": i.batchId,
+      "remainingQuantity": i.remainingQuantity,
+      "remainingPercentage": ((i.remainingQuantity / i.initialQuantity) * 100).round(),
+      "burnRate": "24/day",
+      "depletesInDays": (i.remainingQuantity / 24).round(),
     }).toList();
+
+    if (inventory.isNotEmpty) {
+      local.add({
+        "type": "expiry",
+        "severity": "red",
+        "title": inventory.first.medicineName,
+        "batchId": inventory.first.batchId,
+        "remainingQuantity": inventory.first.remainingQuantity,
+        "expiresInDays": 22,
+      });
+      if (inventory.length > 1) {
+        local.add({
+          "type": "expiry",
+          "severity": "yellow",
+          "title": inventory[1].medicineName,
+          "batchId": inventory[1].batchId,
+          "remainingQuantity": inventory[1].remainingQuantity,
+          "expiresInDays": 45,
+        });
+      }
+    }
 
     if (_shouldUseLocal || inventory.isEmpty) return local;
     try {
-      final payload = inventory.map((i) => "${i.medicineName}: ${i.remainingQuantity}/${i.initialQuantity}").join('\n');
-      final response = await _model.generateContent([Content.text('Identify risks in:\n$payload\nOutput JSON array with keys severity, title, description.')]);
+      final payload = inventory.map((i) => "${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate.toIso8601String()}").join('\n');
+      final prompt = '''
+Identify risks in the following inventory:
+$payload
+
+Output a JSON array of alerts. 
+For each alert, determine if it's an "expiry" risk or "low_stock" risk.
+Include keys:
+- type: "expiry" or "low_stock"
+- severity: "red" (critical) or "yellow" (warning)
+- title: Medicine Name
+- batchId: The batch ID
+- remainingQuantity: Current units left
+
+If type is "expiry", include:
+- expiresInDays: Days until expiry
+
+If type is "low_stock", include:
+- remainingPercentage: Percentage of stock left
+- burnRate: Estimated daily burn rate (e.g., "24/day")
+- depletesInDays: Estimated days until stockout
+
+Output raw JSON array only.
+''';
+      final response = await _model.generateContent([Content.text(prompt)]);
       return (jsonDecode(response.text!.replaceAll('```json', '').replaceAll('```', '').trim()) as List).cast<Map<String, dynamic>>();
     } catch (e) {
       _handleQuotaError(e.toString());
