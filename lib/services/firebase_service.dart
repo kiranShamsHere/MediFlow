@@ -281,8 +281,14 @@ class FirebaseService {
 
     // 3. Seed new facilities
     final List<Map<String, String>> demoFacilities = [
-      {'name': 'Delhi Central Hospital', 'type': 'urban', 'email': 'delhi@mediflow.com', 'password': 'delhi@123'},
-      {'name': 'Sonipat Rural Clinic', 'type': 'rural', 'email': 'sonipat@mediflow.com', 'password': 'sonipat@123'},
+      {'name': 'PHC Rampur', 'type': 'rural', 'email': 'rampur@mediflow.com', 'password': 'password123'},
+      {'name': 'CHC Modinagar', 'type': 'urban', 'email': 'modinagar@mediflow.com', 'password': 'password123'},
+      {'name': 'PHC Loni', 'type': 'urban', 'email': 'loni@mediflow.com', 'password': 'password123'},
+      {'name': 'DH Ghaziabad', 'type': 'urban', 'email': 'ghaziabad@mediflow.com', 'password': 'password123'},
+      {'name': 'PHC Bhojpur', 'type': 'rural', 'email': 'bhojpur@mediflow.com', 'password': 'password123'},
+      {'name': 'CHC Hapur', 'type': 'urban', 'email': 'hapur@mediflow.com', 'password': 'password123'},
+      {'name': 'PHC Dasna', 'type': 'rural', 'email': 'dasna@mediflow.com', 'password': 'password123'},
+      {'name': 'SubCentre Pilkhuwa', 'type': 'rural', 'email': 'pilkhuwa@mediflow.com', 'password': 'password123'},
     ];
 
     for (var f in demoFacilities) {
