@@ -2,42 +2,35 @@
   <img src="https://img.shields.io/badge/Google%20Solution%20Challenge-2026-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Google Solution Challenge 2026">
 </p>
 
-# 🧊 MediTrack AI
+# MediFlow
 **Open Intelligent Cold-Chain Supply Chain Platform for Pharmaceutical Logistics**
-
-<p align="center">
-  <img src="https://img.shields.io/badge/SDG%203-Good%20Health%20%26%20Well--being-4CAF50?style=flat-square" alt="SDG 3">
-  <img src="https://img.shields.io/badge/SDG%209-Industry%20%26%20Infrastructure-FF9800?style=flat-square" alt="SDG 9">
-  <img src="https://img.shields.io/badge/SDG%2017-Partnerships%20for%20Goals-1976D2?style=flat-square" alt="SDG 17">
-</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Flutter-%2302569B.svg?style=for-the-badge&logo=Flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white" alt="Firebase">
   <img src="https://img.shields.io/badge/Gemini%20AI-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white" alt="Gemini AI">
-  <img src="https://img.shields.io/badge/Google%20Maps-4285F4?style=for-the-badge&logo=google-maps&logoColor=white" alt="Google Maps">
   <img src="https://img.shields.io/badge/OpenRouteService-3E3E3E?style=for-the-badge&logo=openstreetmap&logoColor=white" alt="ORS">
 </p>
 
 <p align="center">
-  <a href="#-project-overview">Problem</a> •
-  <a href="#-the-problem--the-solution">Solution</a> •
-  <a href="#-technical-architecture">Architecture</a> •
-  <a href="#-the-team">Team</a>
+  <a href="#project-overview">Problem</a> •
+  <a href="#the-problem--the-solution">Solution</a> •
+  <a href="#technical-architecture">Architecture</a> •
+  <a href="#the-team">Team</a>
 </p>
 
 ---
 
-## 📖 Table of Contents
-- [Project Overview](#-project-overview)
-- [The Problem & Solution](#-the-problem--the-solution)
-- [Core Feature Set](#-core-feature-set)
+## Table of Contents
+- [Project Overview](#project-overview)
+- [The Problem & Solution](#the-problem--the-solution)
+- [Core Feature Set](#core-feature-set)
   - [Hospital/Facility Module](#hospitalfacility-module)
   - [Central Administration Module](#central-administration-module)
 - [Technical Architecture](#technical-architecture)
-  - [The AI Engine (Gemini 1.5 Flash)](#1-the-ai-engine-gemini-15-flash)
-  - [The Optimization Heuristic (OTS)](#2-the-optimization-heuristic-ots)
-  - [Geospatial Routing System](#3-geospatial-routing-system)
+  - [The AI Engine (Gemini 1.5 Flash)](#the-ai-engine-gemini-15-flash)
+  - [The Optimization Heuristic (OTS)](#the-optimization-heuristic-ots)
+  - [Geospatial Routing System](#geospatial-routing-system)
 - [Project Structure](#project-structure)
 - [Data & Schema](#data--schema)
 - [Development & Setup](#development--setup)
@@ -45,17 +38,17 @@
 
 ---
 
-## 🌟 Project Overview
-**MediTrack AI** (formerly MediFlow) is an enterprise-grade medical logistics platform engineered to solve the "Last Mile" medical supply crisis. By combining **Generative AI** for demand forecasting with **Heuristic Optimization** for redistribution, MediTrack AI transforms a fragmented, reactive supply chain into a proactive, life-saving ecosystem, specifically targeting cold-chain pharmaceutical integrity.
+## Project Overview
+**MediFlow** is an enterprise-grade medical logistics platform engineered to solve the "Last Mile" medical supply crisis. By combining **Generative AI** for demand forecasting with **Heuristic Optimization** for redistribution, MediFlow transforms a fragmented, reactive supply chain into a proactive, life-saving ecosystem, specifically targeting cold-chain pharmaceutical integrity.
 
-## ⚠️ The Problem | The Solution
+## The Problem | The Solution
 **The Crisis:** Rural clinics often face 30% higher stockout rates for essential antibiotics, while urban hospitals simultaneously dispose of expired stock due to over-purchasing. This inequality is compounded by the lack of intelligent monitoring for cold-chain medicines (vaccines, insulin).
 
-**The MediTrack Solution:** We don't just track inventory; we **predict** shortages before they happen and **automate** the movement of medicine from surplus hospitals to deficit clinics using road-accurate route optimization, ensuring that every life-saving resource is allocated where it’s needed most.
+**The MediFlow Solution:** We don't just track inventory; we **predict** shortages before they happen and **automate** the movement of medicine from surplus hospitals to deficit clinics using road-accurate route optimization, ensuring that every life-saving resource is allocated where it’s needed most.
 
 ---
 
-## 🚀 Core Feature Set
+## Core Feature Set
 
 ### Hospital/Facility Module
 *   **Smart Logging Engine**: Atomically track daily usage while the system computes burn rates in real-time.
@@ -73,9 +66,9 @@
 
 ---
 
-## 🏛️ Technical Architecture
+## Technical Architecture
 
-MediTrack AI is built on **Clean Architecture** principles, ensuring that business logic is decoupled from the UI and external services.
+MediFlow is built on **Clean Architecture** principles, ensuring that business logic is decoupled from the UI and external services.
 
 ### 1. The AI Engine (Gemini 1.5 Flash)
 We leverage Gemini's large context window to process months of anonymized usage logs. The model acts as a **Predictive Reasoning Layer**, identifying non-obvious patterns like demographic-based medicine consumption surges.
@@ -91,7 +84,7 @@ Integrated with **flutter_map** and **OSRM/OpenRouteService**, our routing engin
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```bash
 lib/
@@ -144,15 +137,15 @@ lib/
 
 ---
 
-## 📊 Data & Schema
-MediTrack AI utilizes a hierarchical Firestore schema designed for high-concurrency performance:
+## Data & Schema
+MediFlow utilizes a hierarchical Firestore schema designed for high-concurrency performance:
 *   **`/facilities`**: Metadata, type (urban/rural), and geospatial coordinates.
 *   **`/inventory/{fac_id}/medicines`**: Sub-collection tracking individual batches and live stock levels.
 *   **`/requests`**: Global collection for tracking movement, status (Pending/Approved/Fulfilled), and manifest details.
 
 ---
 
-## ⚙️ Development & Setup
+## Development & Setup
 
 ### Prerequisites
 - Flutter SDK (>=3.0.0)
@@ -177,14 +170,14 @@ flutter run -d chrome --web-renderer html
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 - [ ] **Offline-First Sync**: Native SQLite integration for zero-connectivity environments.
 - [ ] **Batch Tracking**: QR-code integration for granular tracking of individual medicine strips.
 - [ ] **IoT Cold Chain**: Integration with sensors to track temperature-sensitive vaccines during transit.
 
 ---
 
-## 🤝 The Team
+## The Team
 Built with ❤️ for the **Google Solution Challenge 2026**.
 
 - [Aarush Yadav]
@@ -193,4 +186,4 @@ Built with ❤️ for the **Google Solution Challenge 2026**.
 - [Sharvi Singhal]
 
 ---
-© 2026 MediTrack AI Team. *Engineering a smarter, healthier supply chain.*
+© 2026 MediFlow Team. *Engineering a smarter, healthier supply chain.*
