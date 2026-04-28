@@ -18,12 +18,7 @@
 - [Project Overview](#project-overview)
 - [The Problem & Solution](#the-problem--the-solution)
 - [Core Feature Set](#core-feature-set)
-  - [Hospital/Facility Module](#hospitalfacility-module)
-  - [Central Administration Module](#central-administration-module)
 - [Technical Architecture](#technical-architecture)
-  - [The AI Engine (Gemini 1.5 Flash)](#the-ai-engine-gemini-15-flash)
-  - [The Optimization Heuristic (OTS)](#the-optimization-heuristic-ots)
-  - [Geospatial Routing System](#geospatial-routing-system)
 - [Project Structure](#project-structure)
 - [Data & Schema](#data--schema)
 - [Development & Setup](#development--setup)
@@ -43,37 +38,29 @@
 
 ## Core Feature Set
 
-### Hospital/Facility Module
-*   **Smart Logging Engine**: Atomically track daily usage while the system computes burn rates in real-time.
-*   **AI Forecasting (30-Day)**: Powered by **Gemini-1.5-Flash**, predicting seasonal spikes based on historical usage trends (e.g., ORS demand for summer) with a transparency-first "AI Reasoning" component.
-*   **Automated Request Drafting**: Intelligent auto-population of restock indents and redistribution offers based on AI predictions.
-*   **AI Chat Assistant**: A 24/7 logistics expert that facility managers can query for stock status, expiry alerts, or burn-rate insights.
-
-### Central Administration Module
-*   **Global Command Center**: Real-time regional oversight with deep-dive analytics into every facility's stock health.
-*   **Multi-Step Approval Pipeline**: A secure hub for regional admins to review and prioritize redistribution plans.
-*   **Interactive Logistics Map**: 
-    *   **Donors vs. Recipients**: High-visibility markers distinguishing surplus sites from deficit clinics.
-    *   **Road-Accurate Routing**: Integrated OSRM/ORS paths that calculate real-world travel time and distance.
-*   **Global Optimization**: A "Global Redistribution Plan" that matches thousands of shortage items to local surpluses in seconds.
+| Module | Feature | Description |
+| :--- | :--- | :--- |
+| **Facility** | Smart Logging | Atomic tracking of daily usage with real-time burn rate computation. |
+| **Facility** | AI Forecasting | 30-day predictive spikes powered by Gemini-1.5-Flash with reasoning. |
+| **Facility** | Auto-Drafting | Intelligent population of restock indents based on AI predictions. |
+| **Facility** | AI Assistant | 24/7 logistics expert for stock queries and expiry alerts via NLP. |
+| **Admin** | Command Center | Network-wide regional oversight with deep-dive analytics. |
+| **Admin** | Approval Pipeline | Secure multi-step hub for reviewing redistribution plans. |
+| **Admin** | Logistics Map | Interactive map with road-accurate routing and site classification. |
+| **Admin** | Global Optimization | High-speed matching of shortages to surpluses across the network. |
 
 ---
 
 ## Technical Architecture
 
-MediFlow is built on **Clean Architecture** principles, ensuring that business logic is decoupled from the UI and external services.
-
-### 1. The AI Engine (Gemini 1.5 Flash)
-We leverage Gemini's large context window to process months of anonymized usage logs. The model acts as a **Predictive Reasoning Layer**, identifying non-obvious patterns like demographic-based medicine consumption surges.
-
-### 2. The Optimization Heuristic (OTS)
-Our proprietary **Optimal Transfer Score** ensures that redistribution is both efficient and equitable:
-$$OTS = (w_{dist} \cdot Proximity) + (w_{prior} \cdot RuralPriority) + (w_{qty} \cdot QtyMatch)$$
-*   **Proximity**: Minimizes logistics cost and time.
-*   **Rural Priority**: A weight multiplier ensuring that remote facilities are never "starved" by the algorithm.
-
-### 3. Geospatial Routing System
-Integrated with **flutter_map** and **OSRM/OpenRouteService**, our routing engine decodes complex polylines to provide precise, road-accurate delivery paths, factoring in real-world geography.
+| Component | Technology | Rationale |
+| :--- | :--- | :--- |
+| **Forecasting** | Gemini 1.5 Flash | Large context window for processing months of usage logs & reasoning. |
+| **Optimization** | Heuristic OTS | Proprietary scoring factoring Proximity, Rural Priority, and Qty Match. |
+| **Routing** | OSRM / ORS | Road-accurate pathfinding and geometry decoding for map polylines. |
+| **Backend** | Firebase | Real-time synchronization, atomic transactions, and secure auth. |
+| **Frontend** | Flutter | Multi-platform consistency with high-performance mapping overlays. |
+| **State Mgmt** | Riverpod | Reactive data flow and dependency injection across services. |
 
 ---
 
