@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/firebase_service.dart';
-import '../../main.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   final String role;
@@ -31,7 +31,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref.read(firebaseServiceProvider).seedDemoData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Database seeded ✓ Use delhi@mediflow.com / delhi@123')),
+          const SnackBar(content: Text('Database seeded ✓ Use rampur@mediflow.com / password123')),
         );
       }
     } catch (e) {
@@ -50,11 +50,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _passwordController.text,
           );
       if (widget.role == 'facility') {
-        final fac = await ref.read(firebaseServiceProvider).getFacility(cred.user!.uid);
+        final email = _emailController.text.trim();
+        final facilityId = email.toLowerCase().replaceAll('@', '_').replaceAll('.', '_');
+        final fac = await ref.read(firebaseServiceProvider).getFacility(facilityId);
+        
         if (fac != null) {
           if (mounted) context.go('/facility/${fac.id}/overview');
         } else {
-          throw Exception("No facility found for this account.");
+          throw Exception("No facility found for this account ($email). Please ensure you have seeded the database.");
         }
       } else {
         if (mounted) context.go('/admin/overview');

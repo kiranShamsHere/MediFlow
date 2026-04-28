@@ -252,7 +252,29 @@ Output raw JSON array only.
 
   // ─── REDISTRIBUTION ────────────────────────────────────────────
   Future<String> generateRedistributionPlan(List<MedRequest> requests, List<Facility> facilities) async {
-    return "Optimizing ${requests.length} requests across ${facilities.length} sites.";
+    final indents = requests.where((r) => r.status == RequestStatus.pending && r.type == RequestType.regularIndent).toList();
+    if (indents.isEmpty) return "No active indents found to optimize.";
+
+    try {
+      final prompt = '''
+Analyze these ${indents.length} pending indents across ${facilities.length} health facilities.
+The logistics engine has prioritized routes based on:
+1. Rural Facility Priority (+150 score)
+2. Near Expiry Batches (+100 score)
+3. Proximity and Quantity Matching.
+
+Indents:
+${indents.map((r) => "- ${r.facilityId}: ${r.medicineName} (${r.quantity} units)").join("\n")}
+
+Provide a 2-sentence executive summary explaining the strategy. Mention if any rural facilities were prioritized.
+Output plain text only.
+''';
+      final response = await _model.generateContent([Content.text(prompt)]);
+      return response.text?.trim() ?? "Optimizing redistribution routes based on proximity and stock health.";
+    } catch (e) {
+      _handleQuotaError(e.toString());
+      return "Optimizing ${indents.length} requests across ${facilities.length} sites by matching local surpluses.";
+    }
   }
 
   // ─── SHIPMENT STRATEGY (SEASONAL AI) ─────────────────────────

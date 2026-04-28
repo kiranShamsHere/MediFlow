@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/firebase_service.dart';
-import '../../main.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
 import 'dart:math' as math;
 
 class RoleSelectionScreen extends StatefulWidget {

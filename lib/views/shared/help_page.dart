@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../main.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
 
 class HelpPage extends StatelessWidget {
   final String role;

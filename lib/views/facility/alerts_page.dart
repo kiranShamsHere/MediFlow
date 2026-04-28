@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
 import '../../models/inventory_item.dart';
-import '../../main.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
 import '../shared/ai_chat_page.dart';
 import '../../models/request.dart';
 

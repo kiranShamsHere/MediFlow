@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/ai_service.dart';
 import '../../services/firebase_service.dart';
-import '../../main.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
 
 class AIChatPage extends ConsumerStatefulWidget {
   final String? facilityId;
@@ -196,12 +196,12 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
               color: MediColors.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(Icons.smart_toy_rounded, size: 52, color: MediColors.primary),
+            child: Icon(Icons.smart_toy_rounded, size: 52, color: MediColors.primary),
           ),
           const SizedBox(height: 24),
-          const Text('MediFlow AI Assistant', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: MediColors.textPrimary)),
+          Text('MediFlow AI Assistant', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: MediColors.textPrimary)),
           const SizedBox(height: 8),
-          const Text('Ask about inventory, forecasts, or supply chain insights', style: TextStyle(color: MediColors.textSecondary)),
+          Text('Ask about inventory, forecasts, or supply chain insights', style: TextStyle(color: MediColors.textSecondary)),
           const SizedBox(height: 32),
           Wrap(
             spacing: 12,
@@ -226,7 +226,7 @@ class _AIChatPageState extends ConsumerState<AIChatPage> {
       },
       style: OutlinedButton.styleFrom(
         foregroundColor: MediColors.primary,
-        side: const BorderSide(color: MediColors.border),
+        side: BorderSide(color: MediColors.border),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),

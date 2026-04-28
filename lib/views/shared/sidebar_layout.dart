@@ -2,7 +2,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../main.dart';
+import '../../services/firebase_service.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
 
 class SidebarLayout extends StatefulWidget {
   final Widget child;
@@ -29,16 +30,19 @@ class _SidebarLayoutState extends State<SidebarLayout> {
       if (location.endsWith('/overview')) return 0;
       if (location.endsWith('/forecast')) return 1;
       if (location.endsWith('/indent')) return 2;
-      if (location.endsWith('/logging')) return 3;
-      if (location.endsWith('/alerts')) return 4;
-      if (location.endsWith('/chat')) return 5;
-      if (location.endsWith('/help')) return 6;
+      if (location.endsWith('/active-indents')) return 3;
+      if (location.endsWith('/logging')) return 4;
+      if (location.endsWith('/alerts')) return 5;
+      if (location.endsWith('/chat')) return 6;
+      if (location.endsWith('/help')) return 7;
       return 0;
     } else {
       if (location.endsWith('/overview')) return 0;
-      if (location.endsWith('/routing')) return 1;
-      if (location.endsWith('/chat')) return 2;
-      if (location.endsWith('/help')) return 3;
+      if (location.endsWith('/approvals')) return 1;
+      if (location.endsWith('/indent-status')) return 2;
+      if (location.endsWith('/routing')) return 3;
+      if (location.endsWith('/chat')) return 4;
+      if (location.endsWith('/help')) return 5;
       return 0;
     }
   }
@@ -49,17 +53,20 @@ class _SidebarLayoutState extends State<SidebarLayout> {
         case 0: context.go('/facility/${widget.facilityId}/overview'); break;
         case 1: context.go('/facility/${widget.facilityId}/forecast'); break;
         case 2: context.go('/facility/${widget.facilityId}/indent'); break;
-        case 3: context.go('/facility/${widget.facilityId}/logging'); break;
-        case 4: context.go('/facility/${widget.facilityId}/alerts'); break;
-        case 5: context.go('/facility/${widget.facilityId}/chat'); break;
-        case 6: context.go('/facility/${widget.facilityId}/help'); break;
+        case 3: context.go('/facility/${widget.facilityId}/active-indents'); break;
+        case 4: context.go('/facility/${widget.facilityId}/logging'); break;
+        case 5: context.go('/facility/${widget.facilityId}/alerts'); break;
+        case 6: context.go('/facility/${widget.facilityId}/chat'); break;
+        case 7: context.go('/facility/${widget.facilityId}/help'); break;
       }
     } else if (widget.role == 'admin') {
       switch (index) {
         case 0: context.go('/admin/overview'); break;
-        case 1: context.go('/admin/routing'); break;
-        case 2: context.go('/admin/chat'); break;
-        case 3: context.go('/admin/help'); break;
+        case 1: context.go('/admin/approvals'); break;
+        case 2: context.go('/admin/indent-status'); break;
+        case 3: context.go('/admin/routing'); break;
+        case 4: context.go('/admin/chat'); break;
+        case 5: context.go('/admin/help'); break;
       }
     }
   }
@@ -68,15 +75,18 @@ class _SidebarLayoutState extends State<SidebarLayout> {
       ? [
           _NavItem(Icons.grid_view_rounded, 'Overview'),
           _NavItem(Icons.auto_graph_rounded, 'Forecast'),
-          _NavItem(Icons.receipt_long_rounded, 'Indents'),
+          _NavItem(Icons.receipt_long_rounded, 'Create Indent'),
+          _NavItem(Icons.inventory_2_rounded, 'Active Indents'),
           _NavItem(Icons.edit_calendar_rounded, 'Daily Log'),
           _NavItem(Icons.notifications_active_rounded, 'Alerts'),
           _NavItem(Icons.smart_toy_rounded, 'AI Chat'),
           _NavItem(Icons.help_outline_rounded, 'Help'),
         ]
       : [
-          _NavItem(Icons.grid_view_rounded, 'Overview'),
-          _NavItem(Icons.map_rounded, 'Routing'),
+          _NavItem(Icons.dashboard_rounded, 'Overview'),
+          _NavItem(Icons.rule_rounded, 'Approvals'),
+          _NavItem(Icons.history_rounded, 'Indent Status'),
+          _NavItem(Icons.map_rounded, 'Route Opt.'),
           _NavItem(Icons.smart_toy_rounded, 'AI Chat'),
           _NavItem(Icons.help_outline_rounded, 'Help'),
         ];
@@ -167,36 +177,45 @@ class _SidebarLayoutState extends State<SidebarLayout> {
               color: isSelected ? MediColors.primary.withValues(alpha: 0.12) : Colors.transparent,
               border: isSelected ? Border.all(color: MediColors.primary.withValues(alpha: 0.25)) : null,
             ),
-            child: Row(
-              children: [
-                Icon(
-                  item.icon,
-                  size: 22,
-                  color: isLogout
-                      ? MediColors.error
-                      : isSelected
-                          ? MediColors.primary
-                          : MediColors.textMuted,
-                ),
-                if (_isExpanded) ...[
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            child: ClipRect(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    child: Center(
+                      child: Icon(
+                        item.icon,
+                        size: 22,
                         color: isLogout
                             ? MediColors.error
                             : isSelected
                                 ? MediColors.primary
-                                : MediColors.textSecondary,
+                                : MediColors.textMuted,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (_isExpanded) ...[
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          color: isLogout
+                              ? MediColors.error
+                              : isSelected
+                                  ? MediColors.primary
+                                  : MediColors.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

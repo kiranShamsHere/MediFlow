@@ -8,6 +8,7 @@ class InventoryItem {
   final DateTime expiryDate;
   final int initialQuantity;
   final int remainingQuantity;
+  final String unit;
   final DateTime lastUpdated;
 
   InventoryItem({
@@ -18,6 +19,7 @@ class InventoryItem {
     required this.expiryDate,
     required this.initialQuantity,
     required this.remainingQuantity,
+    required this.unit,
     required this.lastUpdated,
   });
 
@@ -30,6 +32,7 @@ class InventoryItem {
       expiryDate: (map['expiryDate'] as Timestamp).toDate(),
       initialQuantity: map['initialQuantity']?.toInt() ?? 0,
       remainingQuantity: map['remainingQuantity']?.toInt() ?? 0,
+      unit: map['unit'] ?? 'units',
       lastUpdated: map['lastUpdated'] != null 
           ? (map['lastUpdated'] as Timestamp).toDate() 
           : DateTime.now(),
@@ -44,6 +47,7 @@ class InventoryItem {
       'expiryDate': Timestamp.fromDate(expiryDate),
       'initialQuantity': initialQuantity,
       'remainingQuantity': remainingQuantity,
+      'unit': unit,
       'lastUpdated': Timestamp.fromDate(lastUpdated),
     };
   }

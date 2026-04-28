@@ -1,8 +1,11 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/facility.dart';
 import '../models/inventory_item.dart';
 import '../models/daily_usage_log.dart';
+
+final simulationServiceProvider = Provider((ref) => SimulationService(FirebaseFirestore.instance));
 
 class SimulationService {
   final FirebaseFirestore _firestore;
@@ -84,8 +87,8 @@ class SimulationService {
       
       double factor;
       if (persona == 1) {
-        // Critical Health: 15% - 30%
-        factor = 0.15 + (_random.nextDouble() * 0.15);
+        // Critical Health: 5% - 20% (ensure some hit the <15% low stock trigger)
+        factor = 0.05 + (_random.nextDouble() * 0.15);
       } else if (persona == 2) {
         // High Health: 75% - 95%
         factor = 0.75 + (_random.nextDouble() * 0.20);
@@ -103,15 +106,20 @@ class SimulationService {
   }
 
   Future<void> _seedInventory(String facilityId) async {
-    final List<String> medicines = [
-      'Paracetamol', 
-      'Cough Syrup', 
-      'ORS', 
-      'Antibiotic', 
-      'Vitamin Tablets'
-    ];
-
-    for (var med in medicines) {
+    final Map<String, String> medicines = {
+      'Paracetamol': 'tablets',
+      'Cough Syrup': 'vials',
+      'ORS': 'sachets',
+      'Antibiotic': 'capsules',
+      'Vitamin Tablets': 'tablets',
+      'Metformin 500mg': 'tablets',
+      'Iron Folic Acid': 'tablets',
+      'Amoxicillin 250mg': 'capsules'
+    };
+    
+    for (var entry in medicines.entries) {
+      final med = entry.key;
+      final unit = entry.value;
       final medicineId = med.toLowerCase().replaceAll(' ', '_');
       final invRef = _firestore
           .collection('inventory')
@@ -122,13 +130,17 @@ class SimulationService {
       final snapshot = await invRef.get();
       if (!snapshot.exists) {
         final int initialQty = 2000 + _random.nextInt(3000);
+        // Randomize expiry: some long, some soon (15-400 days)
+        final int daysToExpiry = _random.nextInt(10) < 2 ? 15 + _random.nextInt(60) : 180 + _random.nextInt(200);
+        
         await invRef.set({
           'medicineName': med,
           'batchId': 'B-${1000 + _random.nextInt(9000)}',
           'initialQuantity': initialQty,
           'remainingQuantity': initialQty,
-          'arrivalDate': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 130))),
-          'expiryDate': Timestamp.fromDate(DateTime.now().add(const Duration(days: 365))),
+          'unit': unit,
+          'arrivalDate': Timestamp.fromDate(DateTime.now().subtract(Duration(days: 90 + _random.nextInt(100)))),
+          'expiryDate': Timestamp.fromDate(DateTime.now().add(Duration(days: daysToExpiry))),
           'lastUpdated': Timestamp.now(),
         });
       }
@@ -141,13 +153,16 @@ class SimulationService {
     double variation = 0.8 + (_random.nextDouble() * 0.4); // 80% to 120%
     int totalPatients = (basePatients * variation).round();
 
-    // 2. Generate medicine usage
-    final List<String> medicines = ['Paracetamol', 'Cough Syrup', 'ORS', 'Antibiotic', 'Vitamin Tablets'];
+    // 2. Generate medicine usage for ALL medicines
+    final List<String> medicines = [
+      'Paracetamol', 'Cough Syrup', 'ORS', 'Antibiotic', 
+      'Vitamin Tablets', 'Metformin 500mg', 'Iron Folic Acid', 'Amoxicillin 250mg'
+    ];
     List<MedicineUsage> usages = [];
     final month = date.month;
 
     for (var med in medicines) {
-      double usagePerPatient = 0.5; // base usage factor
+      double usagePerPatient = 0.4 + (_random.nextDouble() * 0.3); // more realistic base
 
       // Seasonal Influences
       if ((month >= 11 || month <= 2) && (med == 'Cough Syrup' || med == 'Paracetamol')) {
@@ -156,7 +171,7 @@ class SimulationService {
         usagePerPatient *= 3.0; // Summer spike
       }
 
-      int unitsUsed = (totalPatients * usagePerPatient * (0.9 + _random.nextDouble() * 0.2)).round();
+      int unitsUsed = (totalPatients * usagePerPatient * (0.8 + _random.nextDouble() * 0.4)).round();
       usages.add(MedicineUsage(medicineName: med, unitsDistributed: unitsUsed));
     }
 

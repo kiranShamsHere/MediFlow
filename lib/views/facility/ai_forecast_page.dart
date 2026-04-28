@@ -5,7 +5,7 @@ import '../../models/inventory_item.dart';
 import '../../models/daily_usage_log.dart';
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
-import '../../main.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
 
 class AIForecastPage extends ConsumerStatefulWidget {
   final String facilityId;

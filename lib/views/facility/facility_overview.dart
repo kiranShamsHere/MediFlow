@@ -4,7 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/inventory_item.dart';
 import '../../services/firebase_service.dart';
-import '../../main.dart';
+import '../../services/simulation_service.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
 
 class FacilityOverview extends ConsumerWidget {
   final String facilityId;
@@ -110,9 +111,42 @@ class FacilityOverview extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Greeting
-                Text('Facility Dashboard', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: MediColors.textPrimary)),
-                const SizedBox(height: 4),
-                Text('Real-time inventory monitoring and insights', style: const TextStyle(color: MediColors.textSecondary, fontSize: 14)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Facility Dashboard', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: MediColors.textPrimary)),
+                        const SizedBox(height: 4),
+                        Text('Real-time inventory monitoring and insights', style: const TextStyle(color: MediColors.textSecondary, fontSize: 14)),
+                      ],
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final firebase = ref.read(firebaseServiceProvider);
+                        final fac = await firebase.getFacility(facilityId);
+                        if (fac != null) {
+                          // Show loading
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Simulating 30 days of usage data...')));
+                          }
+                          await ref.read(simulationServiceProvider).runFullSimulation(facilityId, fac.type);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Simulation complete! Analytics ready.')));
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.analytics_outlined),
+                      label: const Text('Simulate Analytics'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: MediColors.primary,
+                        side: const BorderSide(color: MediColors.primary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 28),
 
                 // KPI Cards

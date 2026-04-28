@@ -7,6 +7,11 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'services/firebase_service.dart';
+import 'services/ai_service.dart';
+import 'services/routing_service.dart';
+import 'services/optimization_service.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
 import 'firebase_options.dart';
 import 'views/auth/role_selection_screen.dart';
 import 'views/auth/login_screen.dart';
@@ -17,14 +22,16 @@ import 'views/shared/help_page.dart';
 import 'views/facility/facility_overview.dart';
 import 'views/facility/ai_forecast_page.dart';
 import 'views/facility/indent_creation_page.dart';
+import 'views/facility/active_indents_page.dart';
 import 'views/facility/daily_logging_page.dart';
 import 'views/facility/alerts_page.dart';
 
 // Admin Pages
 import 'views/admin/admin_overview.dart';
+import 'views/admin/admin_indent_approval_page.dart';
+import 'views/admin/admin_indent_status_page.dart';
 import 'views/admin/route_optimization_map.dart';
 import 'views/shared/ai_chat_page.dart';
-
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _facilityShellNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _adminShellNavigatorKey = GlobalKey<NavigatorState>();
@@ -52,54 +59,6 @@ void main() async {
   };
 
   runApp(const ProviderScope(child: MediFlowApp()));
-}
-
-// ── Premium Design System ──────────────────────────────
-class MediColors {
-  // Core Palette
-  static const Color bg = Color(0xFF0B1120);
-  static const Color surface = Color(0xFF141B2D);
-  static const Color surfaceLight = Color(0xFF1C2538);
-  static const Color surfaceHover = Color(0xFF243049);
-  static const Color border = Color(0xFF2A3550);
-  static const Color borderLight = Color(0xFF354363);
-
-  // Text
-  static const Color textPrimary = Color(0xFFF1F5F9);
-  static const Color textSecondary = Color(0xFF8896B3);
-  static const Color textMuted = Color(0xFF5A6B8A);
-
-  // Brand Gradients
-  static const Color primary = Color(0xFF6366F1);
-  static const Color primaryLight = Color(0xFF818CF8);
-  static const Color violet = Color(0xFF8B5CF6);
-  static const Color cyan = Color(0xFF06B6D4);
-  static const Color teal = Color(0xFF14B8A6);
-
-  // Semantic
-  static const Color success = Color(0xFF10B981);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color error = Color(0xFFF43F5E);
-  static const Color info = Color(0xFF3B82F6);
-
-  // Gradients
-  static const LinearGradient primaryGradient = LinearGradient(
-    colors: [primary, violet],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient cyanGradient = LinearGradient(
-    colors: [cyan, teal],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient surfaceGradient = LinearGradient(
-    colors: [surface, surfaceLight],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
 }
 
 final _router = GoRouter(
@@ -134,6 +93,7 @@ final _router = GoRouter(
         GoRoute(path: '/facility/:id/overview', builder: (context, state) => FacilityOverview(facilityId: state.pathParameters['id']!)),
         GoRoute(path: '/facility/:id/forecast', builder: (context, state) => AIForecastPage(facilityId: state.pathParameters['id']!)),
         GoRoute(path: '/facility/:id/indent', builder: (context, state) => IndentCreationPage(facilityId: state.pathParameters['id']!)),
+        GoRoute(path: '/facility/:id/active-indents', builder: (context, state) => ActiveIndentsPage(facilityId: state.pathParameters['id']!)),
         GoRoute(path: '/facility/:id/logging', builder: (context, state) => DailyLoggingPage(facilityId: state.pathParameters['id']!)),
         GoRoute(path: '/facility/:id/alerts', builder: (context, state) => AlertsPage(facilityId: state.pathParameters['id']!)),
         GoRoute(path: '/facility/:id/chat', builder: (context, state) => AIChatPage(facilityId: state.pathParameters['id']!, role: 'facility')),
@@ -147,6 +107,8 @@ final _router = GoRouter(
       },
       routes: [
         GoRoute(path: '/admin/overview', builder: (context, state) => const AdminOverview()),
+        GoRoute(path: '/admin/approvals', builder: (context, state) => const AdminIndentApprovalPage()),
+        GoRoute(path: '/admin/indent-status', builder: (context, state) => const AdminIndentStatusPage()),
         GoRoute(path: '/admin/routing', builder: (context, state) => const RouteOptimizationMap()),
         GoRoute(path: '/admin/chat', builder: (context, state) => const AIChatPage(role: 'admin')),
         GoRoute(path: '/admin/help', builder: (context, state) => const HelpPage(role: 'admin')),

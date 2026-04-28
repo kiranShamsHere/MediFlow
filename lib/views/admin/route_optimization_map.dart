@@ -4,9 +4,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/facility.dart';
 import '../../models/request.dart';
+import '../../models/inventory_item.dart';
 import '../../services/firebase_service.dart';
 import '../../services/ai_service.dart';
-import '../../main.dart';
+import '../../services/routing_service.dart';
+import '../../services/optimization_service.dart';
+import 'package:med_supply_prototype/constants/colors.dart';
 
 class RouteOptimizationMap extends ConsumerStatefulWidget {
   const RouteOptimizationMap({super.key});
@@ -16,10 +19,15 @@ class RouteOptimizationMap extends ConsumerStatefulWidget {
 }
 
 class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
+  final MapController _mapController = MapController();
   List<Facility> _facilities = [];
+  Map<String, List<InventoryItem>> _allInventories = {};
   bool _isLoading = true;
   bool _showRoutes = false;
+  bool _isGenerating = false;
   String _aiSummary = '';
+  List<TransferRecommendation> _recommendations = [];
+  Map<String, List<LatLng>> _roadRoutes = {};
 
   @override
   void initState() {
@@ -28,12 +36,64 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
   }
 
   Future<void> _loadData() async {
-    final facs = await ref.read(firebaseServiceProvider).getFacilities();
+    final firebaseService = ref.read(firebaseServiceProvider);
+    final facs = await firebaseService.getFacilities();
+    
+    Map<String, List<InventoryItem>> inventories = {};
+    for (var f in facs) {
+      final inv = await firebaseService.getInventoryOnce(f.id);
+      inventories[f.id] = inv;
+    }
+
     if (mounted) {
       setState(() {
         _facilities = facs;
+        _allInventories = inventories;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _generateOptimalRoutes(List<MedRequest> requests) async {
+    setState(() => _isGenerating = true);
+    try {
+      final optimizer = ref.read(optimizationServiceProvider);
+      final router = ref.read(routingServiceProvider);
+      final ai = ref.read(aiServiceProvider);
+
+      // 1. Calculate optimal transfers
+      final recs = optimizer.calculateOptimalTransfers(
+        facilities: _facilities,
+        inventories: _allInventories,
+        requests: requests,
+      );
+
+      // 2. Fetch road-accurate routes for each recommendation
+      Map<String, List<LatLng>> routes = {};
+      for (var rec in recs) {
+        final start = LatLng(rec.donor.latitude, rec.donor.longitude);
+        final end = LatLng(rec.recipient.latitude, rec.recipient.longitude);
+        final path = await router.getRoute(start, end);
+        routes['${rec.donor.id}_${rec.recipient.id}'] = path;
+      }
+
+      // 3. Generate AI Summary
+      final summary = await ai.generateRedistributionPlan(requests, _facilities);
+
+      print('RouteOptimizationMap: Generated ${recs.length} recommendations.');
+      print('RouteOptimizationMap: Fetched ${routes.length} road routes.');
+
+      setState(() {
+        _recommendations = recs;
+        _roadRoutes = routes;
+        _aiSummary = summary;
+        _showRoutes = true;
+      });
+    } catch (e) {
+      print('RouteOptimizationMap Error: $e');
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error generating routes: $e')));
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
     }
   }
 
@@ -43,51 +103,15 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
 
     final mapCenter = _facilities.isNotEmpty 
         ? LatLng(_facilities.first.latitude, _facilities.first.longitude) 
-        : const LatLng(28.6139, 77.2090); // Default to Delhi
-
-    // Stream organic requests from Phase 2
-    final requestsStream = ref.watch(firebaseServiceProvider).streamRequests(null);
+        : const LatLng(28.6139, 77.2090);
 
     return Scaffold(
       backgroundColor: MediColors.bg,
-      appBar: AppBar(
-        title: const Text('Route Optimization'),
-      ),
+      appBar: AppBar(title: const Text('Advanced Route Optimization')),
       body: StreamBuilder<List<MedRequest>>(
-        stream: requestsStream,
+        stream: ref.watch(firebaseServiceProvider).streamRequests(null),
         builder: (context, snapshot) {
           final requests = snapshot.data ?? [];
-          
-          // Logic: Build organic distribution paths by finding matching medicine requests between Surplus and Shortage
-          List<Map<String, dynamic>> routeMatches = [];
-          if (_showRoutes && requests.isNotEmpty) {
-            final surpluses = requests.where((r) => r.type == RequestType.surplus).toList();
-            final shortages = requests.where((r) => r.type == RequestType.shortage || r.type == RequestType.regularIndent).toList();
-
-            for (var shortage in shortages) {
-              final match = surpluses.where((s) => s.medicineName == shortage.medicineName && s.facilityId != shortage.facilityId).firstOrNull;
-              if (match != null) {
-                final fromFac = _facilities.firstWhere((f) => f.id == match.facilityId, orElse: () => _facilities.first);
-                final toFac = _facilities.firstWhere((f) => f.id == shortage.facilityId, orElse: () => _facilities.first);
-                
-                // Calculate distance manually mathematically 
-                final Distance distanceCalc = const Distance();
-                final meter = distanceCalc(
-                  LatLng(fromFac.latitude, fromFac.longitude),
-                  LatLng(toFac.latitude, toFac.longitude)
-                );
-                
-                routeMatches.add({
-                  'from': fromFac,
-                  'to': toFac,
-                  'medicine': shortage.medicineName,
-                  'qty': shortage.quantity,
-                  'distance': '${(meter / 1000).toStringAsFixed(1)} km',
-                  'time': '${(meter / 1000 / 40).ceil()}h',
-                });
-              }
-            }
-          }
 
           return Row(
             children: [
@@ -105,12 +129,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                         children: [
                           const Text('Transfer Manifest', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: MediColors.textPrimary)),
                           const SizedBox(height: 8),
-                          const Text('AI-optimized redistribution paths from live Indent Orders.', style: TextStyle(color: MediColors.textSecondary, fontSize: 13)),
+                          const Text('Smart-scored redistribution paths factoring in rural priority and expiry risks.', style: TextStyle(color: MediColors.textSecondary, fontSize: 13)),
                           const SizedBox(height: 16),
                           if (_aiSummary.isNotEmpty && _showRoutes)
                              Container(
                                padding: const EdgeInsets.all(12),
-                               decoration: BoxDecoration(color: MediColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
+                               decoration: BoxDecoration(color: MediColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10), border: Border.all(color: MediColors.primary.withValues(alpha: 0.2))),
                                child: Text(_aiSummary, style: const TextStyle(color: MediColors.primaryLight, fontStyle: FontStyle.italic, fontSize: 13)),
                              ),
                            const SizedBox(height: 24),
@@ -121,47 +145,43 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                               decoration: BoxDecoration(gradient: MediColors.primaryGradient, borderRadius: BorderRadius.circular(12)),
                               child: FilledButton.icon(
                                 style: FilledButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent),
-                                icon: const Icon(Icons.route_rounded),
-                                label: Text(_showRoutes ? 'Hide Routes' : 'Generate Routes'),
-                                onPressed: () async {
-                                  if (!_showRoutes) {
-                                    final summary = await ref.read(aiServiceProvider).generateRedistributionPlan(requests, _facilities);
-                                    setState(() {
-                                      _aiSummary = summary;
-                                      _showRoutes = true;
-                                    });
-                                  } else {
-                                    setState(() => _showRoutes = false);
-                                  }
-                                },
+                                icon: _isGenerating 
+                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : Icon(_showRoutes ? Icons.refresh_rounded : Icons.auto_awesome),
+                                label: Text(_showRoutes ? 'Re-optimize Routes' : 'Generate Optimal Routes'),
+                                onPressed: _isGenerating ? null : () => _generateOptimalRoutes(requests),
                               ),
                             ),
-                          )
+                          ),
+                          if (_showRoutes)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: TextButton(
+                                onPressed: () => setState(() => _showRoutes = false),
+                                child: const Center(child: Text('Clear Map', style: TextStyle(color: MediColors.textMuted))),
+                              ),
+                            ),
                         ],
                       ),
                     ),
                     const Divider(height: 1),
                     Expanded(
                       child: !_showRoutes 
-                        ? const Center(child: Text('Generate routes to see manifest', style: TextStyle(color: MediColors.textMuted)))
-                        : ListView(
-                            padding: const EdgeInsets.all(24),
+                        ? const Center(child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              if (routeMatches.isEmpty) ...[
-                                const Text('No matching Surplus/Shortage vectors found.', style: TextStyle(fontWeight: FontWeight.bold, color: MediColors.warning)),
-                                const SizedBox(height: 12),
-                                const Text('Create matching medicine requests across facilities.', style: TextStyle(color: MediColors.textMuted)),
-                              ] else ...[
-                                ...routeMatches.map((match) => _buildTransferCard(
-                                  from: match['from'].name,
-                                  to: match['to'].name,
-                                  medicine: match['medicine'],
-                                  quantity: '${match['qty']} units',
-                                  distance: match['distance'],
-                                  time: match['time'],
-                                )),
-                              ]
+                              Icon(Icons.map_outlined, size: 48, color: MediColors.textMuted),
+                              SizedBox(height: 12),
+                              Text('Click Generate to start analysis', style: TextStyle(color: MediColors.textMuted)),
                             ],
+                          ))
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(24),
+                            itemCount: _recommendations.length,
+                            itemBuilder: (context, index) {
+                              final rec = _recommendations[index];
+                              return _buildTransferCard(rec);
+                            },
                           ),
                     ),
                   ],
@@ -173,32 +193,44 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                 child: Stack(
                   children: [
                     FlutterMap(
+                      mapController: _mapController,
                       options: MapOptions(
                         initialCenter: mapCenter,
                         initialZoom: 10.0,
+                        interactionOptions: const InteractionOptions(
+                          flags: InteractiveFlag.all,
+                        ),
                       ),
                       children: [
                         TileLayer(
-                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                          subdomains: const ['a', 'b', 'c', 'd'],
                           userAgentPackageName: 'com.mediflow.app',
                         ),
-                        if (_showRoutes && routeMatches.isNotEmpty)
-                          PolylineLayer<Object>(
-                            polylines: routeMatches.map((m) {
-                              Facility fromF = m['from'];
-                              Facility toF = m['to'];
+                        if (_showRoutes)
+                          PolylineLayer(
+                            polylines: _recommendations.map((rec) {
+                              final key = '${rec.donor.id}_${rec.recipient.id}';
+                              final points = _roadRoutes[key] ?? [LatLng(rec.donor.latitude, rec.donor.longitude), LatLng(rec.recipient.latitude, rec.recipient.longitude)];
+                              print('RouteOptimizationMap: Rendering polyline for $key with ${points.length} points');
                               return Polyline(
-                                points: [
-                                  LatLng(fromF.latitude, fromF.longitude),
-                                  LatLng(toF.latitude, toF.longitude),
-                                ],
-                                color: MediColors.primary,
-                                strokeWidth: 4.0,
+                                points: points,
+                                color: rec.recipient.type == 'rural' ? Colors.blueAccent : MediColors.primary,
+                                strokeWidth: 8.0,
                               );
                             }).toList(),
                           ),
                         MarkerLayer(
                           markers: _facilities.map((f) {
+                            bool isDonor = _recommendations.any((r) => r.donor.id == f.id);
+                            bool isRecipient = _recommendations.any((r) => r.recipient.id == f.id);
+                            
+                            Color markerColor = Colors.red; // default
+                            if (_showRoutes) {
+                              if (isDonor) markerColor = Colors.green;
+                              else if (isRecipient) markerColor = Colors.orange;
+                            }
+
                             return Marker(
                               point: LatLng(f.latitude, f.longitude),
                               width: 120,
@@ -206,7 +238,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.local_hospital, color: Colors.red, size: 36),
+                                  Icon(Icons.local_hospital, color: markerColor, size: 36),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -215,7 +247,7 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                                       boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)],
                                     ),
                                     child: Text(
-                                      f.name.length > 16 ? '${f.name.substring(0, 14)}…' : f.name,
+                                      f.name,
                                       style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black87),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -227,7 +259,23 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                         ),
                       ],
                     ),
-                    // Map overlay legend
+                    // Zoom Controls
+                    Positioned(
+                      top: 24,
+                      right: 24,
+                      child: Column(
+                        children: [
+                          _buildMapControl(Icons.add, () {
+                            _mapController.move(_mapController.camera.center, _mapController.camera.zoom + 1);
+                          }),
+                          const SizedBox(height: 8),
+                          _buildMapControl(Icons.remove, () {
+                            _mapController.move(_mapController.camera.center, _mapController.camera.zoom - 1);
+                          }),
+                        ],
+                      ),
+                    ),
+                    // Legend
                     Positioned(
                       bottom: 24,
                       right: 24,
@@ -237,11 +285,12 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Legend', style: TextStyle(fontWeight: FontWeight.bold, color: MediColors.textPrimary)),
-                            const SizedBox(height: 8),
-                            Row(children: [Container(width: 16, height: 16, color: MediColors.primary), const SizedBox(width: 8), const Text('Transfer Vector', style: TextStyle(color: MediColors.textSecondary, fontSize: 12))]),
-                            const SizedBox(height: 8),
-                            const Row(children: [Icon(Icons.local_hospital, color: Colors.red, size: 16), SizedBox(width: 8), Text('Facility', style: TextStyle(color: MediColors.textSecondary, fontSize: 12))]),
+                            const Text('Optimization Legend', style: TextStyle(fontWeight: FontWeight.bold, color: MediColors.textPrimary)),
+                            const SizedBox(height: 12),
+                            _buildLegendItem(Colors.green, 'Donor Site (Surplus)'),
+                            _buildLegendItem(Colors.orange, 'Recipient Site (Deficit)'),
+                            _buildLegendItem(Colors.blueAccent, 'Rural Priority Route'),
+                            _buildLegendItem(MediColors.primary, 'Standard Route'),
                           ],
                         ),
                       ),
@@ -256,36 +305,94 @@ class _RouteOptimizationMapState extends ConsumerState<RouteOptimizationMap> {
     );
   }
 
-  Widget _buildTransferCard({required String from, required String to, required String medicine, required String quantity, required String distance, required String time}) {
+  Widget _buildMapControl(IconData icon, VoidCallback onPressed) {
+    return Container(
+      decoration: BoxDecoration(
+        color: MediColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: MediColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: MediColors.textPrimary),
+        onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(color: MediColors.textSecondary, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransferCard(TransferRecommendation rec) {
+    final Distance distanceCalc = const Distance();
+    final distKm = distanceCalc(LatLng(rec.donor.latitude, rec.donor.longitude), LatLng(rec.recipient.latitude, rec.recipient.longitude)) / 1000;
+    final timeHours = (distKm / 40);
+    final timeMinutes = (timeHours * 60).toInt();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: MediColors.surfaceLight, borderRadius: BorderRadius.circular(14), border: Border.all(color: MediColors.border)),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: MediColors.surfaceLight, borderRadius: BorderRadius.circular(16), border: Border.all(color: MediColors.border)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: MediColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                child: Text('Score: ${rec.score.toInt()}', style: const TextStyle(color: MediColors.primaryLight, fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+              if (rec.recipient.type == 'rural')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: Colors.blueAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                  child: const Text('RURAL PRIORITY', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 10)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
           Row(children: [
-            const Icon(Icons.outbound_rounded, color: MediColors.warning, size: 20),
+            const Icon(Icons.outbound_rounded, color: Colors.green, size: 20),
             const SizedBox(width: 8),
-            Expanded(child: Text(from, style: const TextStyle(fontWeight: FontWeight.w600, color: MediColors.textPrimary))),
+            Expanded(child: Text(rec.donor.name, style: const TextStyle(fontWeight: FontWeight.w600, color: MediColors.textPrimary))),
           ]),
           const Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4), child: Icon(Icons.arrow_downward_rounded, color: MediColors.textMuted, size: 16)),
           Row(children: [
-            const Icon(Icons.input_rounded, color: MediColors.success, size: 20),
+            const Icon(Icons.input_rounded, color: Colors.orange, size: 20),
             const SizedBox(width: 8),
-            Expanded(child: Text(to, style: const TextStyle(fontWeight: FontWeight.w600, color: MediColors.textPrimary))),
+            Expanded(child: Text(rec.recipient.name, style: const TextStyle(fontWeight: FontWeight.w600, color: MediColors.textPrimary))),
           ]),
-          const Divider(height: 24),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(medicine, style: const TextStyle(fontWeight: FontWeight.w600, color: MediColors.textPrimary)),
-              Text(quantity, style: const TextStyle(color: MediColors.textMuted, fontSize: 12)),
-            ]),
-            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Row(children: [const Icon(Icons.route_rounded, size: 14, color: MediColors.primary), const SizedBox(width: 4), Text(distance, style: const TextStyle(color: MediColors.primary, fontWeight: FontWeight.w600))]),
-              Row(children: [const Icon(Icons.schedule_rounded, size: 14, color: MediColors.textMuted), const SizedBox(width: 4), Text(time, style: const TextStyle(color: MediColors.textMuted))]),
-            ]),
-          ]),
+          const Divider(height: 32),
+          Text(rec.medicine, style: const TextStyle(fontWeight: FontWeight.w800, color: MediColors.textPrimary, fontSize: 15)),
+          Text('${rec.quantity} Units requested', style: const TextStyle(color: MediColors.textMuted, fontSize: 13)),
+          const SizedBox(height: 12),
+          Text(rec.reasoning, style: const TextStyle(color: MediColors.primaryLight, fontSize: 11, fontStyle: FontStyle.italic)),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(children: [const Icon(Icons.route_rounded, size: 14, color: MediColors.textMuted), const SizedBox(width: 4), Text('${distKm.toStringAsFixed(1)} km', style: const TextStyle(color: MediColors.textMuted, fontSize: 12))]),
+              Row(children: [const Icon(Icons.schedule_rounded, size: 14, color: MediColors.textMuted), const SizedBox(width: 4), Text('${timeMinutes}m est.', style: const TextStyle(color: MediColors.textMuted, fontSize: 12))]),
+            ],
+          ),
         ],
       ),
     );

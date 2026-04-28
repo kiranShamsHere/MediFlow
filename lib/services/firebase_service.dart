@@ -207,6 +207,12 @@ class FirebaseService {
     });
   }
 
+  Future<void> updateRequestQuantity(String requestId, int quantity) async {
+    await _firestore.collection('requests').doc(requestId).update({
+      'quantity': quantity,
+    });
+  }
+
   Future<void> deleteRequest(String requestId) async {
     await _firestore.collection('requests').doc(requestId).delete();
   }
