@@ -17,24 +17,37 @@
 ## Table of Contents
 - [Project Overview](#project-overview)
 - [The Problem & Solution](#the-problem--the-solution)
+- [Screenshots & UI Preview](#screenshots--ui-preview)
 - [Core Feature Set](#core-feature-set)
-  - [Hospital / Facility Module](#hospital--facility-module)
-  - [Central Administration Module](#central-administration-module)
 - [Technical Architecture](#technical-architecture)
 - [Project Structure](#project-structure)
 - [Data & Schema](#data--schema)
-- [Development & Setup](#development--setup)
+- [Development & Setup Guide](#development--setup-guide)
+- [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+- [The Team](#the-team)
 
 ---
 
 ## Project Overview
-**MediFlow** is an enterprise-grade medical logistics platform engineered to solve the "Last Mile" medical supply crisis. By combining **Generative AI** for demand forecasting with **Heuristic Optimization** for redistribution, MediFlow transforms a fragmented, reactive supply chain into a proactive, life-saving ecosystem, specifically targeting cold-chain pharmaceutical integrity.
+**MediFlow** is an enterprise-grade medical logistics platform engineered to solve the "Last Mile" medical supply crisis. By combining **Generative AI** for demand forecasting with **Heuristic Heuristics** for redistribution, MediFlow transforms a fragmented, reactive supply chain into a proactive, life-saving ecosystem, specifically targeting cold-chain pharmaceutical integrity.
+
+---
 
 ## The Problem | The Solution
 **The Crisis:** Rural clinics often face 30% higher stockout rates for essential antibiotics, while urban hospitals simultaneously dispose of expired stock due to over-purchasing. This inequality is compounded by the lack of intelligent monitoring for cold-chain medicines (vaccines, insulin).
 
 **The MediFlow Solution:** We don't just track inventory; we **predict** shortages before they happen and **automate** the movement of medicine from surplus hospitals to deficit clinics using road-accurate route optimization, ensuring that every life-saving resource is allocated where it’s needed most.
+
+---
+
+## Screenshots & UI Preview
+
+Here is a preview of the MediFlow central command dashboard:
+
+![MediFlow Dashboard Mockup](docs/images/dashboard_preview.jpg)
 
 ---
 
@@ -62,11 +75,30 @@
 
 ## Technical Architecture
 
-| Component | Description |
-| :--- | :--- |
-| **1. AI Engine (Gemini 1.5 Flash)** | We leverage Gemini's large context window to process months of anonymized usage logs. The model acts as a **Predictive Reasoning Layer**, identifying non-obvious patterns like demographic-based medicine consumption surges. |
-| **2. Optimization Heuristic (OTS)** | Our proprietary **Optimal Transfer Score** ensures that redistribution is both efficient and equitable: <br><br> $$OTS = (w_{dist} \cdot Proximity) + (w_{prior} \cdot RuralPriority) + (w_{qty} \cdot QtyMatch)$$ <br><br> • **Proximity**: Minimizes logistics cost and time. <br> • **Rural Priority**: A weight multiplier ensuring that remote facilities are never "starved" by the algorithm. |
-| **3. Geospatial Routing System** | Integrated with **flutter_map** and **OSRM/OpenRouteService**, our routing engine decodes complex polylines to provide precise, road-accurate delivery paths, factoring in real-world geography. |
+MediFlow utilizes a decoupled, serverless architecture that bridges a responsive frontend client with intelligent background processing.
+
+### Architecture Overview
+
+```mermaid
+graph TD
+    A[Flutter Web / Mobile Client] -->|Auth & Live Sync| B[Firebase Auth & Firestore]
+    A -->|Direct Call| C[Cloud Functions Node.js]
+    C -->|Secret Key| D[Gemini 1.5 Flash API]
+    C -->|Data Archiving| E[Google Cloud BigQuery]
+    A -->|Geospatial Queries| F[OpenRouteService / OSRM API]
+    B -->|Trigger Functions| C
+```
+
+### Key Technical Pillars
+
+1. **AI Engine (Gemini 1.5 Flash):** We leverage Gemini's large context window to process months of anonymized usage logs. The model acts as a **Predictive Reasoning Layer**, identifying non-obvious patterns like demographic-based medicine consumption surges.
+2. **Optimization Heuristic (OTS):** Our proprietary **Optimal Transfer Score** ensures that redistribution is both efficient and equitable:
+   
+   $$OTS = (w_{dist} \cdot Proximity) + (w_{prior} \cdot RuralPriority) + (w_{qty} \cdot QtyMatch)$$
+   
+   - **Proximity:** Minimizes logistics cost and time.
+   - **Rural Priority:** A weight multiplier ensuring that remote facilities are never starved by the algorithm.
+3. **Geospatial Routing System:** Integrated with **flutter_map** and **OSRM/OpenRouteService**, our routing engine decodes complex polylines to provide precise, road-accurate delivery paths, factoring in real-world geography.
 
 ---
 
@@ -125,11 +157,12 @@ lib/
 
 ## Data & Schema
 MediFlow utilizes a hierarchical Firestore schema designed for high-concurrency performance:
-*   **`/facilities`**: Metadata, type (urban/rural), and geospatial coordinates.
-*   **`/inventory/{fac_id}/medicines`**: Sub-collection tracking individual batches and live stock levels.
-*   **`/requests`**: Global collection for tracking movement, status (Pending/Approved/Fulfilled), and manifest details.
+* **`/facilities`**: Metadata, type (urban/rural), and geospatial coordinates.
+* **`/inventory/{fac_id}/medicines`**: Sub-collection tracking individual batches and live stock levels.
+* **`/requests`**: Global collection for tracking movement, status (Pending/Approved/Fulfilled), and manifest details.
 
 ---
+
 ### 🔑 Demo Credentials
 | Role | Email ID | Password | Facility Type |
 | :--- | :--- | :--- | :--- |
@@ -143,48 +176,105 @@ MediFlow utilizes a hierarchical Firestore schema designed for high-concurrency 
 | **Facility Head** | `dasna@mediflow.com` | `password123` | Rural PHC |
 | **Facility Head** | `pilkhuwa@mediflow.com` | `password123` | Rural Sub-Centre |
 
+> [!NOTE]
 > If the dashboard appears empty, use the **"Seed DB"** button on the Login/Role Selection screen to populate the database with demo records.
-___
 
-## Development & Setup
+---
+
+## Development & Setup Guide
 
 ### Prerequisites
-- Flutter SDK (>=3.0.0)
-- Firebase Project
-- Google AI Studio API Key (Gemini)
-- OpenRouteService API Key
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (>=3.0.0, recommended `3.41.x`)
+- [Node.js](https://nodejs.org/) (for Firebase Cloud Functions deployment)
+- Firebase Project configured on [Firebase Console](https://console.firebase.google.com/)
+- Google AI Studio API Key (for Gemini)
+- OpenRouteService API Key (for route calculations)
 
-### Quick Start
-```bash
-# 1. Clone & Install
-git clone https://github.com/pavsoss/MediFlow.git && cd MediFlow
-flutter pub get
+### Local Setup Steps
 
-# 2. Configure Environment
-# Create .env and add:
-# GEMINI_API_KEY=your_key
-# ORS_API_KEY=your_key
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/pavsoss/MediFlow.git
+   cd MediFlow
+   ```
 
-# 3. Run Prototype
-flutter run -d chrome --web-renderer html
-```
+2. **Fetch Dependencies:**
+   ```bash
+   flutter pub get
+   ```
+
+3. **Configure the Environment:**
+   Create a `.env` file in the root of the project (and copy from `.env.example` if needed):
+   ```ini
+   GEMINI_API_KEY=your_gemini_api_key
+   ORS_API_KEY=your_openroute_service_key
+   FIREBASE_PROJECT_ID=mediflow-92e6f
+   ```
+
+4. **Initialize Firebase CLI (if modifying functions):**
+   ```bash
+   npm install -g firebase-tools
+   firebase login
+   firebase use mediflow-92e6f
+   ```
+
+5. **Run the Application:**
+   For local web prototype development, run:
+   ```bash
+   flutter run -d chrome --web-renderer html
+   ```
+
+---
+
+## Troubleshooting
+
+### 1. `asset_does_not_exist` Error for `.env`
+If compilation fails with an error indicating `.env` does not exist:
+- Make sure you created a `.env` file in the root folder.
+- If you don't have API keys yet, you can create a placeholder `.env` with dummy values:
+  ```ini
+  GEMINI_API_KEY=dummy_key
+  ORS_API_KEY=dummy_key
+  ```
+
+### 2. Web Map Fails to Render (CORS or Rendering mode)
+If the map does not display in your web browser:
+- Ensure you run the app using `--web-renderer html`. The default CanvasKit renderer sometimes encounters issues fetching tiles from OpenStreetMap.
+- Verify that your OpenRouteService API key is valid and has not exceeded its request limit.
+
+### 3. Cloud Functions Authentication Errors
+If calling Gemini forecasts yields an authentication error:
+- Ensure you are logged in to the application.
+- Verify that you have deployed the Cloud Functions and configured secrets:
+  ```bash
+  firebase functions:secrets:set GEMINI_API_KEY="your_actual_key"
+  ```
 
 ---
 
 ## Future Developments
-- [ ] **Offline-First Sync**: Native SQLite integration for zero-connectivity environments.
-- [ ] **Batch Tracking**: QR-code integration for granular tracking of individual medicine strips.
-- [ ] **IoT Cold Chain**: Integration with sensors to track temperature-sensitive vaccines during transit.
+- [ ] **Offline-First Sync:** Native SQLite integration for zero-connectivity environments.
+- [ ] **Batch Tracking:** QR-code integration for granular tracking of individual medicine strips.
+- [ ] **IoT Cold Chain:** Integration with sensors to track temperature-sensitive vaccines during transit.
+
+---
+
+## Contributing
+We welcome contributions! Please review our [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before submitting pull requests.
+
+---
+
+## License
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
 ## The Team
-Built with ❤️
-
-- [Aarush Yadav]
-- [Paavni Bansal]
-- [Devansh Rana] 
-- [Sharvi Singhal]
+Built with ❤️ by the MediFlow Team:
+- Aarush Yadav
+- Paavni Bansal
+- Devansh Rana
+- Sharvi Singhal
 
 ---
 <p align="center">© 2026 MediFlow Team. <i>Engineering a smarter, healthier supply chain.</i></p>
