@@ -22,6 +22,7 @@ jobs:
         with:
           channel: 'stable'
           cache: true
+          pub-cache: true
 
       - name: Install Flutter Dependencies
         run: flutter pub get
