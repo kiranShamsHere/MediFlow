@@ -190,7 +190,7 @@ async function auditEvent({ eventId, action, entityType, entityId, before, after
  * 1. forecastDemand(facilityId, medicineNames[])
  * Calls Gemini to predict demand based on 90-day history.
  */
-exports.forecastDemand = functions.https.onCall(async (data, context) => {
+exports.forecastDemand = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'User must log in');
 
   const { facilityId, medicineNames } = data;
@@ -550,3 +550,201 @@ exports.onIndentApproved = functions.firestore
       console.log(`Redistribution successful: ${qtyRequested} units of ${medicineName} from ${toFacilityId} to ${fromFacilityId}`);
     }
   });
+
+async function executeTool(name, args) {
+  const db = admin.firestore();
+  if (name === "report_shortage" || name === "report_surplus") {
+    const { facilityId, medicineName, quantity } = args;
+    const type = name === "report_shortage" ? "shortage" : "surplus";
+    await db.collection("requests").add({
+      facilityId: facilityId,
+      medicineName: medicineName,
+      type: type,
+      quantity: Number(quantity),
+      requestDate: admin.firestore.Timestamp.now(),
+      status: "pending",
+      notes: `AI generated ${type} report via Cloud Function`,
+    });
+    return { status: "success", details: `${type} reported for ${quantity} of ${medicineName}` };
+  } else if (name === "check_system_inventory") {
+    const facilitiesSnapshot = await db.collection("facilities").get();
+    const systemStock = {};
+    for (const doc of facilitiesSnapshot.docs) {
+      const fac = doc.data();
+      const facId = doc.id;
+      const invSnapshot = await db.collection("inventory")
+        .doc(facId)
+        .collection("medicines")
+        .get();
+      systemStock[fac.name || facId] = invSnapshot.docs.map((medDoc) => {
+        const item = medDoc.data();
+        return {
+          name: item.medicineName,
+          remaining: item.remainingQuantity,
+          initial: item.initialQuantity,
+        };
+      });
+    }
+    return { status: "success", system_inventory: systemStock };
+  }
+  throw new Error(`Unknown function call: ${name}`);
+}
+
+exports.getForecastSecure = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'User must log in');
+
+  const { medicineName, logs, daysToForecast } = data;
+  const logSummary = logs
+    .map(l => `Date: ${l.date}, Used: ${l.used}`)
+    .join('\n');
+  const prompt = `Forecast ${daysToForecast} days for ${medicineName}. History:\n${logSummary}\nOutput JSON: {"prediction": int, "reasoning": "string"}`;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    return JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
+  } catch (error) {
+    console.error("Gemini Error:", error);
+    throw new functions.https.HttpsError('internal', 'AI forecasting failed');
+  }
+});
+
+exports.generateSmartAlertsSecure = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'User must log in');
+
+  const { inventory } = data;
+  const payload = inventory
+    .map(i => `${i.medicineName} (Batch: ${i.batchId}): ${i.remainingQuantity}/${i.initialQuantity} units left. Expiry: ${i.expiryDate}`)
+    .join('\n');
+
+  const prompt = `Identify risks in the following inventory:\n${payload}\n\nOutput a JSON array of alerts. For each alert, determine if it's an "expiry" risk or "low_stock" risk. Include keys: type, severity, title, batchId, remainingQuantity, and either expiresInDays (for expiry) or remainingPercentage, burnRate, and depletesInDays (for low_stock). Output raw JSON array only.`;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    return JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
+  } catch (error) {
+    console.error("Gemini Error:", error);
+    throw new functions.https.HttpsError('internal', 'AI alert generation failed');
+  }
+});
+
+exports.getChatResponseSecure = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'User must log in');
+
+  const { query, context: clientContext, role, history } = data;
+  const contextStr = JSON.stringify(clientContext);
+
+  const prompt = `Role: ${role}\nSystem Blueprint: System Name: MediFlow AI Intelligence\nArchitecture: Medical Logistics Optimization Platform\nCore Data Models:\n- Facility: {id, name, type: rural/urban, region, coordinates}\n- InventoryItem: {medicineName, batchId, remainingQuantity, initialQuantity, expiryDate, arrivalDate}\n- DailyUsageLog: {date, totalPatients, medicines: [{medicineName, unitsDistributed}]}\n- MedRequest: {id, facilityId, medicineName, quantity, status: pending/fulfilled}\nBusiness Logic:\n1. Burn Rate: Calculated as unitsDistributed / days.\n2. Shipment Strategy: Optimal split of 1yr supply into 1-3 months (Active) and the rest (Cold Storage) based on seasonal historical logs.\n3. Cold Storage: Sub-collection where excess stock is "parked" to improve inventory floor-space efficiency.\n\nCurrent Data: ${contextStr}\nUser Query: ${query}\nAnswer naturally using the blueprint and data.`;
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+    tools: [{
+      functionDeclarations: [
+        {
+          name: "check_system_inventory",
+          description: "Checks the global inventory levels of all facilities."
+        },
+        {
+          name: "report_shortage",
+          description: "Reports a shortage of a medicine at a facility.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              facilityId: { type: "STRING" },
+              medicineName: { type: "STRING" },
+              quantity: { type: "INTEGER" }
+            },
+            required: ["facilityId", "medicineName", "quantity"]
+          }
+        },
+        {
+          name: "report_surplus",
+          description: "Reports a surplus of a medicine at a facility.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              facilityId: { type: "STRING" },
+              medicineName: { type: "STRING" },
+              quantity: { type: "INTEGER" }
+            },
+            required: ["facilityId", "medicineName", "quantity"]
+          }
+        }
+      ]
+    }]
+  });
+
+  try {
+    const formattedHistory = history.map(h => ({
+      role: h.role === 'user' ? 'user' : 'model',
+      parts: [{ text: h.content }]
+    }));
+
+    const chat = model.startChat({
+      history: formattedHistory
+    });
+
+    let result = await chat.sendMessage(prompt);
+    
+    while (result.response.functionCalls && result.response.functionCalls.length > 0) {
+      const functionResponses = [];
+      for (const call of result.response.functionCalls) {
+        let executionResult;
+        try {
+          executionResult = await executeTool(call.name, call.args);
+        } catch (e) {
+          executionResult = { error: e.message };
+        }
+        functionResponses.push({
+          functionResponse: {
+            name: call.name,
+            response: executionResult
+          }
+        });
+      }
+      result = await chat.sendMessage(functionResponses);
+    }
+
+    return result.response.text();
+  } catch (error) {
+    console.error("Chat Error:", error);
+    throw new functions.https.HttpsError('internal', 'AI chat failed');
+  }
+});
+
+exports.callGeminiSecure = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'User must log in');
+
+  const { prompt, imageBase64, imageMimeType } = data;
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    let content;
+    if (imageBase64) {
+      content = [
+        prompt,
+        {
+          inlineData: {
+            data: imageBase64,
+            mimeType: imageMimeType || "image/jpeg"
+          }
+        }
+      ];
+    } else {
+      content = [prompt];
+    }
+
+    const result = await model.generateContent(content);
+    return { text: result.response.text() };
+  } catch (error) {
+    console.error("Gemini callGeminiSecure Error:", error);
+    throw new functions.https.HttpsError('internal', 'AI generation failed');
+  }
+});
+
+

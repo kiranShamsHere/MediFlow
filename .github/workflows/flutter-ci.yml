@@ -23,14 +23,6 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Create Dummy .env File
-        run: |
-          # A dummy .env file is required since it is declared as a asset in pubspec.yaml
-          echo "GEMINI_API_KEY=dummy_gemini_key" > .env
-          echo "ORS_API_KEY=dummy_ors_key" >> .env
-          echo "FIREBASE_PROJECT_ID=mediflow-92e6f" >> .env
-          echo "FIREBASE_API_KEY=dummy_firebase_key" >> .env
-
       - name: Install Dependencies
         run: flutter pub get
 
