@@ -357,8 +357,10 @@ class FacilityOverview extends ConsumerWidget {
   Future<void> _exportInventoryCsv(BuildContext context, WidgetRef ref,
       List<InventoryItem> inventory) async {
     try {
-      final fac = await ref.read(firebaseServiceProvider).getFacility(facilityId);
-      await CsvExportService.exportInventory(inventory, facilityName: fac?.name);
+      final fac =
+          await ref.read(firebaseServiceProvider).getFacility(facilityId);
+      await CsvExportService.exportInventory(inventory,
+          facilityName: fac?.name);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Inventory CSV exported ✓')));

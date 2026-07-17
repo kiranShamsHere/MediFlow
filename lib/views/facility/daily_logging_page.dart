@@ -96,8 +96,7 @@ class _DailyLoggingPageState extends ConsumerState<DailyLoggingPage>
     setState(() => _isExportingCsv = true);
     try {
       final firebase = ref.read(firebaseServiceProvider);
-      final logs =
-          await firebase.getRecentLogs(widget.facilityId, days: 120);
+      final logs = await firebase.getRecentLogs(widget.facilityId, days: 120);
       if (logs.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
